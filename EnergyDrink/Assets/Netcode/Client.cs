@@ -7,8 +7,10 @@ using UnityEngine;
 public class Client : MonoBehaviour
 {
     [Header("Servers")]
-    public string relayHost = "127.0.0.1";
-    public int relayPort = 9001;
+    public string serverIp = "144.126.152.174";
+    public int httpPort = 9000;
+    public int punchPort = 9001;
+    public int relayPort = 9002;
 
     [Header("ClientId (u128 = hi | lo)")]
     public ulong clientIdHigh = 0;
@@ -22,10 +24,12 @@ public class Client : MonoBehaviour
     IPEndPoint relayEp;
     Thread recvThread;
     volatile bool running;
+    Synapse synapse;
 
     void Start()
     {
-        relayEp = new IPEndPoint(IPAddress.Parse(relayHost), relayPort);
+        synapse = new Synapse(serverIp, httpPort);
+        relayEp = new IPEndPoint(IPAddress.Parse(serverIp), relayPort);
         udp = new UdpClient(0);
         udp.Client.ReceiveTimeout = 1000;
 
@@ -46,7 +50,7 @@ public class Client : MonoBehaviour
 
     public void CreateRoom()
     {
-        StartCoroutine(Synapse.CreateRoomCo(ClientIdString(), resp =>
+        StartCoroutine(synapse.CreateRoomCo(ClientIdString(), resp =>
         {
             currentRoomId = resp.room_id;
         }));
@@ -54,7 +58,7 @@ public class Client : MonoBehaviour
 
     public void JoinRoom()
     {
-        StartCoroutine(Synapse.JoinRoomCo(ClientIdString(), roomIdToJoin, resp =>
+        StartCoroutine(synapse.JoinRoomCo(ClientIdString(), roomIdToJoin, resp =>
         {
             currentRoomId = roomIdToJoin;
         }));
@@ -62,7 +66,7 @@ public class Client : MonoBehaviour
 
     public void LeaveRoom()
     {
-        StartCoroutine(Synapse.LeaveRoomCo(ClientIdString(), resp =>
+        StartCoroutine(synapse.LeaveRoomCo(ClientIdString(), resp =>
         {
             currentRoomId = 0;
         }));

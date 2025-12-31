@@ -3,16 +3,20 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
 
-public static class Synapse
+public class Synapse
 {
-    private static string httpBaseUrl = "http://127.0.0.1:3000";
+    private string _url;
+    public Synapse(string url, int port)
+    {
+        _url = $"https://{url}:{port}";
+    }
 
     [Serializable] private class CreateRoomReq { public string client_id; }
     [Serializable] public class CreateRoomResp { public ulong room_id; }
 
-    public static IEnumerator CreateRoomCo(string clientId, Action<CreateRoomResp> onSuccess)
+    public IEnumerator CreateRoomCo(string clientId, Action<CreateRoomResp> onSuccess)
     {
-        var url = $"{httpBaseUrl}/create_room";
+        var url = $"{_url}/create_room";
         var body = JsonUtility.ToJson(new CreateRoomReq { client_id = clientId });
 
         yield return SendHttp(url, body, text =>
@@ -26,9 +30,9 @@ public static class Synapse
     [Serializable] private class JoinRoomReq { public string client_id; }
     [Serializable] public class JoinRoomResp { }
 
-    public static IEnumerator JoinRoomCo(string clientId, ulong roomId, Action<JoinRoomResp> onSuccess)
+    public IEnumerator JoinRoomCo(string clientId, ulong roomId, Action<JoinRoomResp> onSuccess)
     {
-        var url = $"{httpBaseUrl}/join_room/{roomId}";
+        var url = $"{_url}/join_room/{roomId}";
         var body = JsonUtility.ToJson(new JoinRoomReq { client_id = clientId });
 
         yield return SendHttp(url, body, text =>
@@ -42,9 +46,9 @@ public static class Synapse
     [Serializable] private class LeaveRoomReq { public string client_id; }
     [Serializable] public class LeaveRoomResp { }
 
-    public static IEnumerator LeaveRoomCo(string clientId, Action<LeaveRoomResp> onSuccess)
+    public IEnumerator LeaveRoomCo(string clientId, Action<LeaveRoomResp> onSuccess)
     {
-        var url = $"{httpBaseUrl}/leave_room";
+        var url = $"{_url}/leave_room";
         var body = JsonUtility.ToJson(new LeaveRoomReq { client_id = clientId });
 
         yield return SendHttp(url, body, text =>
