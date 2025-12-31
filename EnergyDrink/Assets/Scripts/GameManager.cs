@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Threading.Tasks;
 using Netcode.Rollback;
 using Netcode.Rollback.Network;
 using Netcode.Rollback.Sessions;
@@ -9,6 +10,14 @@ using UnityEngine.Assertions;
 
 public class GameManager : MonoBehaviour
 {
+    [Header("Testing")]
+    public ulong EditorRoomId;
+    public Task JoinRoomFromEditorAsync(ulong roomId)
+    {
+        if (_synapse == null) throw new InvalidOperationException("_synapse is null. Enter Play Mode first.");
+        return _synapse.JoinRoomAsync(roomId);
+    }
+
     [Header("Servers")]
     public string ServerIp = "144.126.152.174";
     public int HttpPort = 9000;
