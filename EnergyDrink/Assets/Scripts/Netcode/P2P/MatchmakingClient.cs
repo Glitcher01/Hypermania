@@ -28,6 +28,9 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
     public SteamMatchmakingClient()
     {
         RegisterCallbacks();
+
+        Debug.Log("[Matchmaking] SteamMatchmakingClient constructed. Initializing relay network access.");
+        SteamNetworkingUtils.InitRelayNetworkAccess();
     }
 
     public async Task<CSteamID> Create(int maxMembers = 2)
@@ -35,7 +38,8 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         if (maxMembers <= 0) throw new ArgumentOutOfRangeException(nameof(maxMembers));
         EnsureNotDisposed();
 
-        await Leave().ConfigureAwait(false);
+        Debug.Log($"[Matchmaking] Create(maxMembers={maxMembers})");
+        await Leave();
 
         _maxMembers = maxMembers;
 
@@ -43,14 +47,19 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         var call = SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypePrivate, maxMembers);
         _lobbyCreatedCallResult.Set(call);
 
-        var lobbyId = await _lobbyCreatedTcs.Task.ConfigureAwait(false);
+        Debug.Log("[Matchmaking] CreateLobby issued. Waiting for LobbyCreated_t...");
+        var lobbyId = await _lobbyCreatedTcs.Task;
+
         _currentLobby = lobbyId;
+        Debug.Log($"[Matchmaking] Lobby created: {_currentLobby.m_SteamID}");
 
         SteamMatchmaking.SetLobbyData(_currentLobby, "version", "1");
         SteamMatchmaking.SetLobbyData(_currentLobby, "game", "EnergyDrink");
         SteamMatchmaking.SetLobbyData(_currentLobby, "maxMembers", maxMembers.ToString());
 
         RefreshPeerFromLobby();
+        Debug.Log($"[Matchmaking] Lobby data set. Peer={(_peer.IsValid() ? _peer.m_SteamID.ToString() : "none")}");
+
         return lobbyId;
     }
 
@@ -59,28 +68,42 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         if (!lobbyId.IsValid()) throw new ArgumentException("Invalid lobby id.", nameof(lobbyId));
         EnsureNotDisposed();
 
-        await Leave().ConfigureAwait(false);
+        Debug.Log($"[Matchmaking] Join(lobbyId={lobbyId.m_SteamID})");
+        await Leave();
 
         _lobbyEnterTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         SteamMatchmaking.JoinLobby(lobbyId);
 
-        await _lobbyEnterTcs.Task.ConfigureAwait(false);
+        Debug.Log("[Matchmaking] JoinLobby issued. Waiting for LobbyEnter_t...");
+        await _lobbyEnterTcs.Task;
+
         _currentLobby = lobbyId;
+        Debug.Log($"[Matchmaking] Joined lobby: {_currentLobby.m_SteamID}");
 
         if (int.TryParse(SteamMatchmaking.GetLobbyData(_currentLobby, "maxMembers"), out int mm) && mm > 0)
+        {
             _maxMembers = mm;
+            Debug.Log($"[Matchmaking] Read lobby maxMembers={_maxMembers}");
+        }
+        else
+        {
+            Debug.Log("[Matchmaking] Lobby maxMembers missing/invalid; keeping current.");
+        }
 
         RefreshPeerFromLobby();
+        Debug.Log($"[Matchmaking] After join, Peer={(_peer.IsValid() ? _peer.m_SteamID.ToString() : "none")}");
     }
 
     public Task Leave()
     {
         EnsureNotDisposed();
 
+        Debug.Log("[Matchmaking] Leave()");
         CloseConnection();
 
         if (_currentLobby.IsValid())
         {
+            Debug.Log($"[Matchmaking] Leaving lobby {_currentLobby.m_SteamID}");
             SteamMatchmaking.LeaveLobby(_currentLobby);
             _currentLobby = default;
         }
@@ -113,9 +136,10 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         _host = SteamMatchmaking.GetLobbyOwner(_currentLobby);
         _iAmHost = (_host == Me);
 
+        Debug.Log($"[Matchmaking] StartGame(): lobby={_currentLobby.m_SteamID}, host={_host.m_SteamID}, me={Me.m_SteamID}, iAmHost={_iAmHost}, peer={_peer.m_SteamID}");
+
         if (_iAmHost)
         {
-            // Host publishes deterministic handles (optional) and starts listening BEFORE telling clients to connect.
             ComputeHandlesDeterministic();
             PublishHandlesToLobby();
 
@@ -124,11 +148,11 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
             SendLobbyStartMessage();
             _startSentByHost = true;
 
-            // Do NOT call ConnectP2P as host; peer will connect inbound and we accept in callback.
+            Debug.Log("[Matchmaking] Host started listen socket, published handles, and sent START message. Awaiting inbound connection...");
         }
         else
         {
-            // Peer waits for START message in OnLobbyChatMessage then connects to _host.
+            Debug.Log("[Matchmaking] Client armed StartGame. Waiting for START message from host...");
         }
 
         return _startGameTcs.Task;
@@ -142,7 +166,6 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         if (_conn == HSteamNetConnection.Invalid)
             throw new InvalidOperationException("No active connection.");
 
-        // 1v1 only: enforce sending only to the connected peer
         if (_peer.IsValid() && addr != _peer)
             throw new InvalidOperationException($"Attempted to send to {addr} but connected peer is {_peer}.");
 
@@ -194,7 +217,6 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
                     Message decoded = default;
                     decoded.Deserialize(data);
 
-                    // 1v1: one peer
                     received.Add((_peer, decoded));
                 }
                 finally
@@ -210,6 +232,12 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
     // ---------- Internals ----------
     private const string START_MSG = "__START__";
     private const string HANDLES_KEY = "handles"; // "steamid:handle,steamid:handle,..."
+
+    // Transport tuning:
+    // - Enable ICE so direct/NAT-punched routes are considered.
+    // - Add an SDR penalty so relayed routes are only chosen when needed.
+    private const int SDR_PENALTY_MS = 1000;
+    private const int ICE_ENABLE_ALL = unchecked((int)0x7fffffff);
 
     private bool _disposed;
 
@@ -243,6 +271,7 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
 
     private void RegisterCallbacks()
     {
+        Debug.Log("[Matchmaking] RegisterCallbacks()");
         _lobbyEnterCb = Callback<LobbyEnter_t>.Create(OnLobbyEnter);
         _lobbyChatUpdateCb = Callback<LobbyChatUpdate_t>.Create(OnLobbyChatUpdate);
         _lobbyChatMsgCb = Callback<LobbyChatMsg_t>.Create(OnLobbyChatMessage);
@@ -255,7 +284,13 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
 
     private void OnLobbyCreated(LobbyCreated_t data, bool ioFailure)
     {
-        if (_lobbyCreatedTcs == null) return;
+        if (_lobbyCreatedTcs == null)
+        {
+            Debug.Log("[Matchmaking] OnLobbyCreated: no TCS (ignored).");
+            return;
+        }
+
+        Debug.Log($"[Matchmaking] OnLobbyCreated: ioFailure={ioFailure}, result={data.m_eResult}, lobby={data.m_ulSteamIDLobby}");
 
         if (ioFailure || data.m_eResult != EResult.k_EResultOK)
         {
@@ -269,6 +304,8 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
 
     private void OnLobbyEnter(LobbyEnter_t data)
     {
+        Debug.Log($"[Matchmaking] OnLobbyEnter: lobby={data.m_ulSteamIDLobby}, response={data.m_EChatRoomEnterResponse}");
+
         bool ok = data.m_EChatRoomEnterResponse == (uint)EChatRoomEnterResponse.k_EChatRoomEnterResponseSuccess;
         if (!ok)
         {
@@ -285,7 +322,10 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         if (!_currentLobby.IsValid() || data.m_ulSteamIDLobby != _currentLobby.m_SteamID)
             return;
 
+        Debug.Log($"[Matchmaking] OnLobbyChatUpdate: lobby={data.m_ulSteamIDLobby}, userChanged={data.m_ulSteamIDUserChanged}, makingChange={data.m_ulSteamIDMakingChange}, stateChange={data.m_rgfChatMemberStateChange}");
+
         RefreshPeerFromLobby();
+        Debug.Log($"[Matchmaking] Peer refresh after chat update: Peer={(_peer.IsValid() ? _peer.m_SteamID.ToString() : "none")}");
     }
 
     private void OnLobbyChatMessage(LobbyChatMsg_t data)
@@ -308,6 +348,7 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         if (len <= 0) return;
 
         string text = System.Text.Encoding.UTF8.GetString(buffer, 0, len).TrimEnd('\0');
+        Debug.Log($"[Matchmaking] OnLobbyChatMessage: from={user.m_SteamID}, type={type}, text='{text}'");
 
         if (text == START_MSG)
         {
@@ -316,21 +357,25 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
             _host = SteamMatchmaking.GetLobbyOwner(_currentLobby);
             _iAmHost = (_host == Me);
 
-            // Compute handles deterministically on all clients (host+joiners).
+            Debug.Log($"[Matchmaking] Received START. host={_host.m_SteamID}, me={Me.m_SteamID}, iAmHost={_iAmHost}");
+
             ComputeHandlesDeterministic();
             TryVerifyHandlesFromLobbyData();
 
             RefreshPeerFromLobby();
+            Debug.Log($"[Matchmaking] After START: Peer={(_peer.IsValid() ? _peer.m_SteamID.ToString() : "none")}");
 
-            // Peer connects to host. Host does NOT connect.
             if (!_iAmHost && _host.IsValid())
+            {
+                Debug.Log($"[Matchmaking] Client connecting to host via ConnectP2P. host={_host.m_SteamID}, sdrPenaltyMs={SDR_PENALTY_MS}, iceEnable=ALL");
                 EnsureClientConnectionToHost(_host);
+            }
         }
     }
 
     private void OnGameLobbyJoinRequested(GameLobbyJoinRequested_t data)
     {
-        // Optional: auto-join when invited / clicked join.
+        Debug.Log($"[Matchmaking] OnGameLobbyJoinRequested: lobby={data.m_steamIDLobby.m_SteamID}");
         // SteamMatchmaking.JoinLobby(data.m_steamIDLobby);
     }
 
@@ -353,6 +398,7 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
 
     private void SendLobbyStartMessage()
     {
+        Debug.Log($"[Matchmaking] Sending START lobby chat message. lobby={_currentLobby.m_SteamID}");
         byte[] bytes = System.Text.Encoding.UTF8.GetBytes(START_MSG);
         SteamMatchmaking.SendLobbyChatMsg(_currentLobby, bytes, bytes.Length);
     }
@@ -365,11 +411,9 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         int count = SteamMatchmaking.GetNumLobbyMembers(_currentLobby);
         if (count <= 0) return;
 
-        int n = Math.Min(count, Math.Max(1, _maxMembers));
-
         var owner = SteamMatchmaking.GetLobbyOwner(_currentLobby);
 
-        var others = new List<CSteamID>(n);
+        var others = new List<CSteamID>(count);
         for (int i = 0; i < count; i++)
         {
             var m = SteamMatchmaking.GetLobbyMemberByIndex(_currentLobby, i);
@@ -385,6 +429,8 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         int handle = 1;
         for (int i = 0; i < others.Count && handle < _maxMembers; i++, handle++)
             _handles[others[i]] = handle;
+
+        Debug.Log($"[Matchmaking] Computed handles: owner={owner.m_SteamID}->0, count={_handles.Count}");
     }
 
     private void PublishHandlesToLobby()
@@ -395,13 +441,20 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         foreach (var kv in _handles)
             parts.Add($"{kv.Key.m_SteamID}:{kv.Value}");
 
-        SteamMatchmaking.SetLobbyData(_currentLobby, HANDLES_KEY, string.Join(",", parts));
+        string encoded = string.Join(",", parts);
+        SteamMatchmaking.SetLobbyData(_currentLobby, HANDLES_KEY, encoded);
+
+        Debug.Log($"[Matchmaking] Published handles to lobby data key='{HANDLES_KEY}': {encoded}");
     }
 
     private void TryVerifyHandlesFromLobbyData()
     {
         string s = SteamMatchmaking.GetLobbyData(_currentLobby, HANDLES_KEY);
-        if (string.IsNullOrEmpty(s)) return;
+        if (string.IsNullOrEmpty(s))
+        {
+            Debug.Log("[Matchmaking] No handles lobby data to verify.");
+            return;
+        }
 
         var parsed = new Dictionary<ulong, int>();
         var entries = s.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
@@ -417,8 +470,13 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         foreach (var kv in _handles)
         {
             if (!parsed.TryGetValue(kv.Key.m_SteamID, out int h) || h != kv.Value)
+            {
+                Debug.LogWarning($"[Matchmaking] Handle verify mismatch for {kv.Key.m_SteamID}: local={kv.Value}, lobby={(parsed.TryGetValue(kv.Key.m_SteamID, out int lh) ? lh.ToString() : "missing")}");
                 return;
+            }
         }
+
+        Debug.Log("[Matchmaking] Handles verified against lobby data.");
     }
 
     private void EnsureListenSocket()
@@ -426,10 +484,35 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         if (_listen != HSteamListenSocket.Invalid)
             return;
 
-        // Host-only listen socket.
+        Debug.Log($"[Matchmaking] Creating listen socket (P2P). virtPort=0");
         _listen = SteamNetworkingSockets.CreateListenSocketP2P(0, 0, null);
         if (_listen == HSteamListenSocket.Invalid)
             throw new InvalidOperationException("CreateListenSocketP2P returned invalid listen socket handle.");
+
+        Debug.Log($"[Matchmaking] Listen socket created: {_listen.m_HSteamListenSocket}. Applying ICE/SDR config via SetConfigValue...");
+
+        // Apply settings to the listen socket so accepted connections inherit them.
+        unsafe
+        {
+            int iceEnable = ICE_ENABLE_ALL;         // 0x7fffffff ("All")
+            int sdrPenalty = SDR_PENALTY_MS;        // e.g. 1000
+
+            bool okIce = SteamNetworkingUtils.SetConfigValue(
+                ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_P2P_Transport_ICE_Enable,
+                ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_ListenSocket,
+                (IntPtr)_listen.m_HSteamListenSocket,
+                ESteamNetworkingConfigDataType.k_ESteamNetworkingConfig_Int32,
+                (IntPtr)(&iceEnable));
+
+            bool okSdr = SteamNetworkingUtils.SetConfigValue(
+                ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_P2P_Transport_SDR_Penalty,
+                ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_ListenSocket,
+                (IntPtr)_listen.m_HSteamListenSocket,
+                ESteamNetworkingConfigDataType.k_ESteamNetworkingConfig_Int32,
+                (IntPtr)(&sdrPenalty));
+
+            Debug.Log($"[Matchmaking] SetConfigValue(listen): ICE_Enable={(okIce ? "OK" : "FAIL")} value={iceEnable}, SDR_Penalty={(okSdr ? "OK" : "FAIL")} value={sdrPenalty}");
+        }
     }
 
     private HSteamNetConnection EnsureClientConnectionToHost(CSteamID host)
@@ -438,83 +521,126 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         if (_iAmHost) throw new InvalidOperationException("Host should not ConnectP2P to itself.");
 
         if (_conn != HSteamNetConnection.Invalid)
+        {
+            Debug.Log($"[Matchmaking] Already have connection handle: {_conn.m_HSteamNetConnection}");
             return _conn;
+        }
 
         var id = new SteamNetworkingIdentity();
         id.SetSteamID(host);
 
+        Debug.Log($"[Matchmaking] Calling ConnectP2P to host={host.m_SteamID} (virtPort=0)");
         _conn = SteamNetworkingSockets.ConnectP2P(ref id, 0, 0, null);
+
         if (_conn == HSteamNetConnection.Invalid)
             throw new InvalidOperationException("ConnectP2P returned invalid connection handle.");
+
+        Debug.Log($"[Matchmaking] ConnectP2P returned connection handle: {_conn.m_HSteamNetConnection}. Applying ICE/SDR config via SetConfigValue...");
+
+        // Apply settings to this specific outbound connection attempt.
+        unsafe
+        {
+            int iceEnable = ICE_ENABLE_ALL;     // 0x7fffffff ("All")
+            int sdrPenalty = SDR_PENALTY_MS;    // e.g. 1000
+
+            bool okIce = SteamNetworkingUtils.SetConfigValue(
+                ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_P2P_Transport_ICE_Enable,
+                ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection,
+                (IntPtr)_conn.m_HSteamNetConnection,
+                ESteamNetworkingConfigDataType.k_ESteamNetworkingConfig_Int32,
+                &iceEnable);
+
+            bool okSdr = SteamNetworkingUtils.SetConfigValue(
+                ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_P2P_Transport_SDR_Penalty,
+                ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection,
+                (IntPtr)_conn.m_HSteamNetConnection,
+                ESteamNetworkingConfigDataType.k_ESteamNetworkingConfig_Int32,
+                &sdrPenalty);
+
+            Debug.Log($"[Matchmaking] SetConfigValue(conn): ICE_Enable={(okIce ? "OK" : "FAIL")} value={iceEnable}, SDR_Penalty={(okSdr ? "OK" : "FAIL")} value={sdrPenalty}");
+        }
 
         return _conn;
     }
 
+
     private void OnNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t data)
     {
+        Debug.Log($"[Matchmaking] OnNetConnectionStatusChanged: conn={data.m_hConn.m_HSteamNetConnection}, old={data.m_eOldState}, new={data.m_info.m_eState}, listen={data.m_info.m_hListenSocket.m_HSteamListenSocket}, endReason={data.m_info.m_eEndReason}");
+
         switch (data.m_info.m_eState)
         {
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connecting:
-            {
-                // Host accepts inbound connections (peer initiated ConnectP2P).
-                if (_iAmHost)
                 {
-                    Debug.Log("Accepting inbound P2P connection");
-                    SteamNetworkingSockets.AcceptConnection(data.m_hConn);
+                    if (_iAmHost)
+                    {
+                        Debug.Log("[Matchmaking] Incoming connection in Connecting state. Accepting now.");
+                        var r = SteamNetworkingSockets.AcceptConnection(data.m_hConn);
+                        Debug.Log($"[Matchmaking] AcceptConnection result: {r}");
+                    }
+                    else
+                    {
+                        Debug.Log("[Matchmaking] Outbound connection in Connecting state.");
+                    }
+                    break;
                 }
-                break;
-            }
 
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected:
-            {
-                // For host, connection handle arrives here (inbound).
-                // For peer, this is the same handle returned by ConnectP2P, but keep it consistent.
-                if (_conn == HSteamNetConnection.Invalid)
-                    _conn = data.m_hConn;
-
-                // Identify remote and set _peer if needed.
-                var remoteId = data.m_info.m_identityRemote;
-                var remoteSteamId = remoteId.GetSteamID();
-                if (remoteSteamId.IsValid())
                 {
-                    // For host, remote is the peer. For peer, remote is the host.
-                    _peer = remoteSteamId;
-                }
-                else
-                {
-                    // Fallback to lobby-derived peer.
-                    RefreshPeerFromLobby();
-                }
+                    if (_conn == HSteamNetConnection.Invalid)
+                    {
+                        _conn = data.m_hConn;
+                        Debug.Log($"[Matchmaking] Stored connection handle: {_conn.m_HSteamNetConnection}");
+                    }
 
-                // Ensure handles exist even if host didn't publish.
-                if (_handles.Count == 0)
-                {
-                    ComputeHandlesDeterministic();
-                    TryVerifyHandlesFromLobbyData();
-                }
+                    var remoteId = data.m_info.m_identityRemote;
+                    var remoteSteamId = remoteId.GetSteamID();
+                    if (remoteSteamId.IsValid())
+                    {
+                        _peer = remoteSteamId;
+                        Debug.Log($"[Matchmaking] Connected. Remote SteamID={_peer.m_SteamID}");
+                    }
+                    else
+                    {
+                        RefreshPeerFromLobby();
+                        Debug.Log($"[Matchmaking] Connected but remote identity invalid; using lobby-derived peer={(_peer.IsValid() ? _peer.m_SteamID.ToString() : "none")}");
+                    }
 
-                if (_startArmed && _startSentByHost)
-                {
-                    _startGameTcs?.TrySetResult(new Dictionary<CSteamID, int>(_handles));
-                    OnStartGame?.Invoke(_peer);
-                }
+                    if (_handles.Count == 0)
+                    {
+                        ComputeHandlesDeterministic();
+                        TryVerifyHandlesFromLobbyData();
+                    }
 
-                break;
-            }
+                    if (_startArmed && _startSentByHost)
+                    {
+                        Debug.Log("[Matchmaking] Connection established and start armed. Completing StartGame TCS.");
+                        _startGameTcs?.TrySetResult(new Dictionary<CSteamID, int>(_handles));
+                        OnStartGame?.Invoke(_peer);
+                    }
+                    else
+                    {
+                        Debug.Log($"[Matchmaking] Connected but start not armed/sent yet. startArmed={_startArmed}, startSentByHost={_startSentByHost}");
+                    }
+
+                    break;
+                }
 
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer:
-            {
-                if (_conn != HSteamNetConnection.Invalid)
                 {
-                    SteamNetworkingSockets.CloseConnection(_conn, 0, "closed", false);
-                    _conn = HSteamNetConnection.Invalid;
-                }
+                    Debug.LogWarning($"[Matchmaking] Connection ended. state={data.m_info.m_eState}, endReason={data.m_info.m_eEndReason}, debug='{data.m_info.m_szEndDebug}'");
 
-                _startGameTcs?.TrySetException(
-                    new InvalidOperationException($"Connection closed: state={data.m_info.m_eState}, endReason={data.m_info.m_eEndReason}"));
-                break;
-            }
+                    if (_conn != HSteamNetConnection.Invalid)
+                    {
+                        SteamNetworkingSockets.CloseConnection(_conn, 0, "closed", false);
+                        _conn = HSteamNetConnection.Invalid;
+                    }
+
+                    _startGameTcs?.TrySetException(
+                        new InvalidOperationException($"Connection closed: state={data.m_info.m_eState}, endReason={data.m_info.m_eEndReason}"));
+                    break;
+                }
         }
     }
 
@@ -522,12 +648,14 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
     {
         if (_conn != HSteamNetConnection.Invalid)
         {
+            Debug.Log($"[Matchmaking] Closing connection: {_conn.m_HSteamNetConnection}");
             SteamNetworkingSockets.CloseConnection(_conn, 0, "leaving", false);
             _conn = HSteamNetConnection.Invalid;
         }
 
         if (_listen != HSteamListenSocket.Invalid)
         {
+            Debug.Log($"[Matchmaking] Closing listen socket: {_listen.m_HSteamListenSocket}");
             SteamNetworkingSockets.CloseListenSocket(_listen);
             _listen = HSteamListenSocket.Invalid;
         }
@@ -543,6 +671,7 @@ public sealed class SteamMatchmakingClient : IDisposable, INonBlockingSocket<CSt
         if (_disposed) return;
         _disposed = true;
 
+        Debug.Log("[Matchmaking] Dispose()");
         CloseConnection();
 
         _lobbyEnterCb?.Unregister();
