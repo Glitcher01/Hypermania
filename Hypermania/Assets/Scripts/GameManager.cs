@@ -9,11 +9,6 @@ using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
-    [Header("Servers")]
-    public string ServerIp = "144.126.152.174";
-    public int HttpPort = 9000;
-    public int RelayPort = 9002;
-
     [SerializeField]
     private GameObject _bob1;
     [SerializeField]
@@ -25,11 +20,6 @@ public class GameManager : MonoBehaviour
     private uint _waitRemaining;
     private SteamMatchmakingClient _client;
 
-    void Awake()
-    {
-        _playing = false;
-    }
-
     void OnDestroy()
     {
         _playing = false;
@@ -37,6 +27,7 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        _playing = false;
         _client = new SteamMatchmakingClient();
     }
 
@@ -51,7 +42,6 @@ public class GameManager : MonoBehaviour
             Debug.LogException(task.Exception);
             yield break;
         }
-        Debug.Log($"Created lobby {task.Result}");
     }
 
     public void JoinLobby(CSteamID lobbyId) => StartCoroutine(JoinLobbyRoutine(lobbyId));
@@ -65,7 +55,6 @@ public class GameManager : MonoBehaviour
             Debug.LogException(task.Exception);
             yield break;
         }
-        Debug.Log($"Joined lobby {lobbyId}");
     }
 
     public void LeaveLobby() => StartCoroutine(LeaveLobbyRoutine());
@@ -79,7 +68,6 @@ public class GameManager : MonoBehaviour
             Debug.LogException(task.Exception);
             yield break;
         }
-        Debug.Log($"Left lobby");
     }
 
     public void StartGame() => StartCoroutine(StartGameRoutine());
@@ -102,7 +90,7 @@ public class GameManager : MonoBehaviour
         SessionBuilder<Input, CSteamID> builder = new SessionBuilder<Input, CSteamID>().WithNumPlayers(2).WithFps(64);
         foreach ((CSteamID id, int handle) in handles)
         {
-            Debug.Log($"Adding player with id {id} and handle {handle}");
+            Debug.Log($"[Game] Adding player with id {id} and handle {handle}");
             builder.AddPlayer(new PlayerType<CSteamID> { Kind = _client.Me == id ? PlayerKind.Local : PlayerKind.Remote, Address = id }, new PlayerHandle(handle));
         }
         _session = builder.StartP2PSession<GameState>(_client);
@@ -111,19 +99,14 @@ public class GameManager : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (_client == null)
-        {
-            return;
-        }
-        if (!_playing)
-        {
-            return;
-        }
+        if (_client == null) { return; }
+        if (!_playing) { return; }
         GameLoop();
     }
 
     void GameLoop()
     {
+        if (_session == null) { return; }
         if (_waitRemaining > 0)
         {
             Debug.Log("[Game] Skipping frame due to wait recommendation");
