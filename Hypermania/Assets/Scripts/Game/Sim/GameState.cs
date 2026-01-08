@@ -152,7 +152,7 @@ namespace Game.Sim
             }
             else if (clank.HasValue)
             {
-                HandleCollision(collide.Value);
+                HandleCollision(clank.Value);
             }
             else if (collide.HasValue)
             {
