@@ -8,6 +8,7 @@ namespace Game.View
     public class GameView : MonoBehaviour
     {
         public FighterView[] Fighters => _fighters;
+
         private FighterView[] _fighters;
         private CharacterConfig[] _characters;
 
@@ -17,6 +18,7 @@ namespace Game.View
             _characters = characters;
             for (int i = 0; i < characters.Length; i++)
             {
+                _fighters[i] = Instantiate(_characters[i].Prefab);
                 _fighters[i].Init(characters[i]);
             }
         }

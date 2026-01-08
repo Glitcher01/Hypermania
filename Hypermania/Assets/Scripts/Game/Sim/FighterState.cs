@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using Design;
+using Design.Animation;
 using MemoryPack;
 using UnityEngine;
 using Utils;
@@ -39,18 +40,25 @@ namespace Game.Sim
         public Vector2 Velocity;
 
         public FighterAttackType AttackType;
-        public FighterMode Mode { get; private set; }
-        public Frame ModeSt { get; private set; }
 
         /// <summary>
-        /// The number of ticks remaining for the current mode. If the mode is Neutral or another mode that should last indefinitely, you can set
-        /// this value to int.MaxValue.
+        /// The animation state of the chararcter, indicates which animation is currently playing.
+        /// </summary>
+        public CharacterAnimation AnimState { get; private set; }
+        public Frame AnimSt { get; private set; }
+
+        public FighterMode Mode { get; private set; }
+
+        /// <summary>
+        /// The number of ticks remaining for the current mode. If the mode is Neutral or another mode that should last
+        /// indefinitely, you can set this value to int.MaxValue.
         /// <br/><br/>
-        /// Note that if you perform a transition in the middle of a frame, the value you set to ModeT will depend on which part of the frame you
-        /// set it on. In general, if the state transition happens before physics/projectile/hurtbox calculations, ModeT should be set to the true value:
-        /// i.e. a move lasting one frame (which is applied right after inputs) should set ModeT to 1. If the state transition happens after
-        /// physics/projectile/hurtbox calculations, you should set ModeT to the true value + 1: i.e. a 1 frame HitStun applied after physics
-        /// calculations should set ModeT to 2.
+        /// Note that if you perform a transition in the middle of a frame, the value you set to ModeT will depend on
+        /// which part of the frame you set it on. In general, if the state transition happens before
+        /// physics/projectile/hurtbox calculations, ModeT should be set to the true value: i.e. a move lasting one
+        /// frame (which is applied right after inputs) should set ModeT to 1. If the state transition happens after
+        /// physics/projectile/hurtbox calculations, you should set ModeT to the true value + 1: i.e. a 1 frame HitStun
+        /// applied after physics calculations should set ModeT to 2.
         /// </summary>
         public int ModeT;
 
@@ -77,14 +85,15 @@ namespace Game.Sim
             state.Position = position;
             state.Velocity = Vector2.zero;
             state.Mode = FighterMode.Neutral;
-            state.ModeSt = Frame.FirstFrame;
             state.ModeT = int.MaxValue;
             state.AttackType = FighterAttackType.Invalid;
             state.FacingDirection = facingDirection;
+            state.AnimState = CharacterAnimation.Idle;
+            state.AnimSt = Frame.FirstFrame;
             return state;
         }
 
-        public void ApplyMovementIntent(Frame frame, GameInput input, CharacterConfig characterConfig)
+        public void ApplyInputIntent(GameInput input, CharacterConfig characterConfig)
         {
             // Horizontal movement
             switch (Mode)
@@ -107,7 +116,6 @@ namespace Game.Sim
                                         Velocity = Vector2.zero;
                                         Mode = FighterMode.Attacking;
                                         AttackType = FighterAttackType.Light;
-                                        ModeSt = frame;
                                         ModeT = characterConfig.LightAttack.TotalTicks;
                                     }
                                     break;
@@ -130,7 +138,6 @@ namespace Game.Sim
             {
                 Mode = FighterMode.Neutral;
                 AttackType = FighterAttackType.Invalid;
-                ModeSt = frame;
                 ModeT = int.MaxValue;
             }
             if (LastLocation != Location)
@@ -159,6 +166,49 @@ namespace Game.Sim
                 if (Velocity.y < 0)
                     Velocity.y = 0;
             }
+        }
+
+        public void PlaceBoxes(Frame frame, CharacterConfig config)
+        {
+            int tick = frame - AnimSt;
+            FrameData frameData = config.GetFrameData(AnimState, tick);
+
+            foreach (var box in frameData.Boxes)
+            {
+                Vector2 centerLocal = box.CenterLocal;
+                Vector2 sizeLocal = box.SizeLocal;
+                Vector2 centerWorld = Position + centerLocal;
+            }
+        }
+
+        public CharacterAnimation CalculateSetAnimationState(Frame frame)
+        {
+            CharacterAnimation newAnim = CharacterAnimation.Idle;
+            if (Mode == FighterMode.Attacking)
+            {
+                if (AttackType == FighterAttackType.Light)
+                {
+                    newAnim = CharacterAnimation.LightAttack;
+                }
+            }
+
+            if (Mode == FighterMode.Neutral)
+            {
+                if (Location == FighterLocation.Airborne)
+                {
+                    newAnim = CharacterAnimation.Jump;
+                }
+                if (Velocity.magnitude > 0.01f)
+                {
+                    newAnim = CharacterAnimation.Walk;
+                }
+            }
+            if (newAnim != AnimState)
+            {
+                AnimState = newAnim;
+                AnimSt = frame;
+            }
+            return AnimState;
         }
     }
 }

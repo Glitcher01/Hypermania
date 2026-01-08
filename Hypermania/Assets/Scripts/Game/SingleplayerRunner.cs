@@ -44,7 +44,11 @@ namespace Game
         {
             // TODO: take in character selections from matchmaking/lobby
             CharacterConfig sampleConfig = _characterConfigs.Get(Character.SampleFighter);
-            _characters = new CharacterConfig[2] { sampleConfig, sampleConfig };
+            _characters = new CharacterConfig[players.Count];
+            for (int i = 0; i < players.Count; i++)
+            {
+                _characters[i] = sampleConfig;
+            }
 
             _curState = GameState.Create(_characters);
             SessionBuilder<GameInput, SteamNetworkingIdentity> builder = new SessionBuilder<
@@ -102,30 +106,23 @@ namespace Game
             }
 
             _session.AddLocalInput(new PlayerHandle(0), _inputBuffer.Consume());
-            try
+            List<RollbackRequest<GameState, GameInput>> requests = _session.AdvanceFrame();
+            foreach (RollbackRequest<GameState, GameInput> request in requests)
             {
-                List<RollbackRequest<GameState, GameInput>> requests = _session.AdvanceFrame();
-                foreach (RollbackRequest<GameState, GameInput> request in requests)
+                switch (request.Kind)
                 {
-                    switch (request.Kind)
-                    {
-                        case RollbackRequestKind.SaveGameStateReq:
-                            var saveReq = request.GetSaveGameStateReq();
-                            saveReq.Cell.Save(saveReq.Frame, _curState, _curState.Checksum());
-                            break;
-                        case RollbackRequestKind.LoadGameStateReq:
-                            var loadReq = request.GetLoadGameStateReq();
-                            loadReq.Cell.Load(out _curState);
-                            break;
-                        case RollbackRequestKind.AdvanceFrameReq:
-                            _curState.Advance(request.GetAdvanceFrameRequest().Inputs, _characters);
-                            break;
-                    }
+                    case RollbackRequestKind.SaveGameStateReq:
+                        var saveReq = request.GetSaveGameStateReq();
+                        saveReq.Cell.Save(saveReq.Frame, _curState, _curState.Checksum());
+                        break;
+                    case RollbackRequestKind.LoadGameStateReq:
+                        var loadReq = request.GetLoadGameStateReq();
+                        loadReq.Cell.Load(out _curState);
+                        break;
+                    case RollbackRequestKind.AdvanceFrameReq:
+                        _curState.Advance(request.GetAdvanceFrameRequest().Inputs, _characters);
+                        break;
                 }
-            }
-            catch (Exception e)
-            {
-                Debug.Log($"[Game] Exception {e}");
             }
 
             _view.Render(_curState);

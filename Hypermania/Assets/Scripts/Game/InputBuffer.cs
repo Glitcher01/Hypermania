@@ -30,7 +30,6 @@ namespace Game
         public GameInput Consume()
         {
             GameInput res = new GameInput(_curInput);
-            Debug.Log($"Consuming game input {res.Flags}");
             _curInput = InputFlags.None;
             return res;
         }

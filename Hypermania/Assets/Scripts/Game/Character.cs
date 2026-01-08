@@ -7,7 +7,7 @@ namespace Game
         Walk,
         Jump,
         Idle,
-        LightAtttack,
+        LightAttack,
     }
 
     [Serializable]

@@ -20,7 +20,7 @@ namespace Game.Sim
                 _freeList.PushBack(i);
         }
 
-        public int Spawn()
+        public int Spawn(in T item)
         {
             if (_freeList.Count == 0)
                 throw new InvalidOperationException("No more space in pool");
@@ -30,7 +30,7 @@ namespace Game.Sim
                 throw new InvalidOperationException("Pool corruption: spawning an already-valid slot");
 
             _objects[ind].valid = true;
-            _objects[ind].item = default!;
+            _objects[ind].item = item;
             return ind;
         }
 
@@ -44,6 +44,17 @@ namespace Game.Sim
 
             _objects[ind] = default!;
             _freeList.PushBack(ind);
+        }
+
+        public void Clear()
+        {
+            for (int i = 0; i < _objects.Length; i++)
+            {
+                if (_objects[i].valid)
+                {
+                    Release(i);
+                }
+            }
         }
 
         public ref T this[int index]
