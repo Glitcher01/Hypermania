@@ -3,6 +3,7 @@ using Design;
 using Design.Animation;
 using MemoryPack;
 using UnityEngine;
+using UnityEngine.UIElements;
 using Utils;
 using Utils.SoftFloat;
 
@@ -36,6 +37,7 @@ namespace Game.Sim
         public SVector2 Velocity;
         public sfloat Health;
         public LT_inputHistory inputH;
+        public int dashTick; // Tracks if / how long we dash.
 
         /// <summary>
         /// The animation state of the chararcter, indicates which animation is currently playing.
@@ -82,6 +84,7 @@ namespace Game.Sim
             state.AnimState = CharacterAnimation.Idle;
             state.AnimSt = Frame.FirstFrame;
             state.inputH = LT_inputHistory.Create();
+            state.dashTick = 0;
             return state;
         }
 
@@ -117,14 +120,58 @@ namespace Game.Sim
             {
                 return;
             }
-            if (Location(config) == FighterLocation.Grounded)
+            // Calculate xDir / yDir separately separately.
+            int xDir = 0, yDir = 0;
+            if ((input.Flags & InputFlags.Left) == InputFlags.Left)
+            {
+                xDir--;
+            }
+
+            if ((input.Flags & InputFlags.Right) == InputFlags.Right)
+            {
+                xDir++;
+            }
+
+            if ((input.Flags & InputFlags.Up) == InputFlags.Up)
+            {
+                yDir++;
+            }
+
+            if ((input.Flags & InputFlags.Down) == InputFlags.Down)
+            {
+                yDir--;
+            }
+
+            FighterLocation placement = Location(config);
+
+            if (placement == FighterLocation.Grounded)
                 Velocity.x = 0;
-            if ((input.Flags & InputFlags.Left) == InputFlags.Left && Location(config) == FighterLocation.Grounded)
-                Velocity.x += (sfloat)(-characterConfig.Speed);
-            if ((input.Flags & InputFlags.Right) == InputFlags.Right && Location(config) == FighterLocation.Grounded)
-                Velocity.x += (sfloat)characterConfig.Speed;
-            if ((input.Flags & InputFlags.Up) == InputFlags.Up && Location(config) == FighterLocation.Grounded)
-                Velocity.y = (sfloat)characterConfig.JumpVelocity;
+            if (xDir != 0 && placement == FighterLocation.Grounded)
+            {
+                if ((input.Flags & InputFlags.Right) == InputFlags.Right)
+                {
+                    Debug.Log(inputH.wasTyped(InputFlags.Right, 12));
+                }
+                // If we've double tapped left / right and are on the ground, ground dash and enable dash tick = 12.
+                if (inputH.wasTyped(InputFlags.Right, 12) && (input.Flags & InputFlags.Right) == InputFlags.Right || 
+                    inputH.wasTyped(InputFlags.Left, 12) && (input.Flags & InputFlags.Left) == InputFlags.Left)
+                {
+                    dashTick = 12; // Amount of frames we dash.
+                }
+                Velocity.x = (sfloat)(xDir * characterConfig.Speed);
+            }
+            if (dashTick > 0) // Applies while they're dashing (jumping into air continues the dash momentum)
+            {
+                Velocity.x = (sfloat)(xDir * 2 * characterConfig.Speed);
+                dashTick--;
+            }
+            if (yDir == 1)
+            {
+                if (placement == FighterLocation.Grounded)
+                {
+                    Velocity.y = (sfloat)characterConfig.JumpVelocity;
+                }
+            }
         }
 
         public void ApplyActiveState(Frame frame, GameInput input, CharacterConfig characterConfig, GlobalConfig config)
@@ -179,7 +226,7 @@ namespace Game.Sim
             if (ModeT <= 0)
             {
                 // Checks if beforehand, the super attack was inputted 8 frames or below. If so, execute immediately after cooldown.
-                if ((inputH.wasPressed(InputFlags.SuperAttack, 8)) && Location(config) == FighterLocation.Grounded)
+                if ((inputH.isHeldRecently(InputFlags.SuperAttack, 8)) && Location(config) == FighterLocation.Grounded)
                 {
                     Velocity = SVector2.zero;
                     Mode = FighterMode.Attacking;

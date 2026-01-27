@@ -39,8 +39,8 @@ namespace Game.Sim
             int idx = (front - 1 - framesAgo + buffer.Length) % buffer.Length;
             return buffer[idx];
         }
-
-        public bool wasPressed(InputFlags flag, int withinFrames)
+        // Checks if the button was pressed within the last couple of frames.
+        public bool isHeldRecently(InputFlags flag, int withinFrames)
         {
             if (withinFrames < 0 || withinFrames >= count)
             {
@@ -49,6 +49,30 @@ namespace Game.Sim
             for (int i = 0; i < withinFrames; i++)
             {
                 if ((getInput(i).Flags & flag) == flag)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Was the key ever pressed and then released in this frame of time?
+        public bool wasTyped(InputFlags flag, int withinFrames)
+        {
+            if (withinFrames < 0 || withinFrames >= count)
+            {
+                return false;
+            }
+            bool beingPressed = false;
+            for (int i = withinFrames - 1; i >= 0; i--)
+            {
+                if ((getInput(i).Flags & flag) == flag && !beingPressed)
+                {
+                    beingPressed = true;
+                    continue;
+                }
+
+                if ((getInput(i).Flags & flag) != flag && beingPressed)
                 {
                     return true;
                 }
