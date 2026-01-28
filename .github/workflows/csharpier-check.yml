@@ -9,9 +9,6 @@ on:
 jobs:
   csharpier:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: Hypermania
 
     steps:
       - uses: actions/checkout@v4
