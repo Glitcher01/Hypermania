@@ -495,21 +495,21 @@ MonoBehaviour:
       m_Sprite: {fileID: -4309669537955753529, guid: 14222601f6de24887b62d652b9754d37, type: 3}
       m_FromMain: 0
       m_SpriteOverride: {fileID: -4309669537955753529, guid: 14222601f6de24887b62d652b9754d37, type: 3}
-    - m_Name: L fist SCYTHE back of hand forwards
-      m_Hash: 6911201
-      m_Sprite: {fileID: -4010559289778618049, guid: 14222601f6de24887b62d652b9754d37, type: 3}
-      m_FromMain: 0
-      m_SpriteOverride: {fileID: -4010559289778618049, guid: 14222601f6de24887b62d652b9754d37, type: 3}
-    - m_Name: L fist SCYTHE fingers forward
-      m_Hash: 740558084
-      m_Sprite: {fileID: -7595933126672274887, guid: 14222601f6de24887b62d652b9754d37, type: 3}
-      m_FromMain: 0
-      m_SpriteOverride: {fileID: -7595933126672274887, guid: 14222601f6de24887b62d652b9754d37, type: 3}
     - m_Name: L ppen hand palm
       m_Hash: 704762978
       m_Sprite: {fileID: -6419610346502999974, guid: 14222601f6de24887b62d652b9754d37, type: 3}
       m_FromMain: 0
       m_SpriteOverride: {fileID: -6419610346502999974, guid: 14222601f6de24887b62d652b9754d37, type: 3}
+    - m_Name: L_fist_fingers_fwd_scythe
+      m_Hash: 684482396
+      m_Sprite: {fileID: -1693159868110649647, guid: 14222601f6de24887b62d652b9754d37, type: 3}
+      m_FromMain: 0
+      m_SpriteOverride: {fileID: -1693159868110649647, guid: 14222601f6de24887b62d652b9754d37, type: 3}
+    - m_Name: L_fist_fingers_back_scythe
+      m_Hash: 16989037
+      m_Sprite: {fileID: 4873940121649608161, guid: 14222601f6de24887b62d652b9754d37, type: 3}
+      m_FromMain: 0
+      m_SpriteOverride: {fileID: 4873940121649608161, guid: 14222601f6de24887b62d652b9754d37, type: 3}
     m_FromMain: 0
     m_EntryOverrideCount: 6
   - m_Name: L_fingers
@@ -560,6 +560,33 @@ MonoBehaviour:
       m_SpriteOverride: {fileID: -3920698614513961260, guid: 14222601f6de24887b62d652b9754d37, type: 3}
     m_FromMain: 0
     m_EntryOverrideCount: 4
+  - m_Name: L_jacket
+    m_Hash: 558085567
+    m_CategoryList: []
+    m_OverrideEntries:
+    - m_Name: L_jacket_0_45
+      m_Hash: 196204966
+      m_Sprite: {fileID: -6760200359468531596, guid: 14222601f6de24887b62d652b9754d37, type: 3}
+      m_FromMain: 0
+      m_SpriteOverride: {fileID: -6760200359468531596, guid: 14222601f6de24887b62d652b9754d37, type: 3}
+    - m_Name: L_jacket_90_180
+      m_Hash: 546180492
+      m_Sprite: {fileID: 4185586486550437290, guid: 14222601f6de24887b62d652b9754d37, type: 3}
+      m_FromMain: 0
+      m_SpriteOverride: {fileID: 4185586486550437290, guid: 14222601f6de24887b62d652b9754d37, type: 3}
+    m_FromMain: 0
+    m_EntryOverrideCount: 2
+  - m_Name: L_arm
+    m_Hash: 793836071
+    m_CategoryList: []
+    m_OverrideEntries:
+    - m_Name: L_arm_0_180
+      m_Hash: 733927310
+      m_Sprite: {fileID: -3065216779570538003, guid: 14222601f6de24887b62d652b9754d37, type: 3}
+      m_FromMain: 0
+      m_SpriteOverride: {fileID: -3065216779570538003, guid: 14222601f6de24887b62d652b9754d37, type: 3}
+    m_FromMain: 0
+    m_EntryOverrideCount: 1
   m_PrimaryLibraryGUID: 
-  m_ModificationHash: 639054890121413768
+  m_ModificationHash: 639054984089756350
   m_Version: 1
