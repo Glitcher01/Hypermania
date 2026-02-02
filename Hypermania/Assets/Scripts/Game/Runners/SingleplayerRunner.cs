@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Design;
 using Game.Sim;
+using Game.View;
 using Netcode.P2P;
 using Netcode.Rollback;
 using Netcode.Rollback.Sessions;
@@ -98,12 +99,7 @@ namespace Game.Runners
                 DeInit();
                 return;
             }
-            NC_InfoOverlayDetails details = new NC_InfoOverlayDetails
-            {
-                FPS = 60, // ephermal
-                HasPing = false,
-                PingMs = 0,
-            };
+            InfoOverlayDetails details = new InfoOverlayDetails { HasPing = false, Ping = 0 };
             _view.Render(_curState, _config, details);
         }
     }

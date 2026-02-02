@@ -32,7 +32,8 @@ namespace Game.View
         private ComboCountView[] ComboViews;
 
         [SerializeField]
-        private NC_InfoOverlayView _overlayView;
+        private InfoOverlayView _overlayView;
+
         public void OnValidate()
         {
             if (Healthbars == null)
@@ -85,7 +86,7 @@ namespace Game.View
             _conductor.Init();
         }
 
-        public void Render(in GameState state, GlobalConfig config, NC_InfoOverlayDetails overlayDetails)
+        public void Render(in GameState state, GlobalConfig config, InfoOverlayDetails overlayDetails)
         {
             for (int i = 0; i < _characters.Length; i++)
             {

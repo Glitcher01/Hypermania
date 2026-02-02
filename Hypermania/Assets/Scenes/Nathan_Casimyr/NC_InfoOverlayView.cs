@@ -5,7 +5,6 @@ using Game.View;
 using TMPro;
 using UnityEngine;
 
-
 public class NC_InfoOverlayView : MonoBehaviour
 {
     public void Render(NC_InfoOverlayDetails details)
@@ -14,11 +13,13 @@ public class NC_InfoOverlayView : MonoBehaviour
         if (details.HasPing)
         {
             detailsString += details.PingMs + "ms";
-        } 
+        }
         GetComponent<TMP_Text>().SetText(detailsString);
     }
 }
-public struct NC_InfoOverlayDetails {
+
+public struct NC_InfoOverlayDetails
+{
     public int FPS;
     public bool HasPing;
     public ulong PingMs;
