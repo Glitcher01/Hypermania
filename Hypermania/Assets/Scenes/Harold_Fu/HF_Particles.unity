@@ -315,11 +315,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 436996793186811645, guid: e4ac134936150764f97aac7c4d5eead2, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.64422953
+      value: 1.74
       objectReference: {fileID: 0}
     - target: {fileID: 436996793186811645, guid: e4ac134936150764f97aac7c4d5eead2, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.6518009
+      value: -0.36
       objectReference: {fileID: 0}
     - target: {fileID: 436996793186811645, guid: e4ac134936150764f97aac7c4d5eead2, type: 3}
       propertyPath: m_LocalPosition.z
@@ -355,7 +355,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4696631248389831294, guid: e4ac134936150764f97aac7c4d5eead2, type: 3}
       propertyPath: m_Name
-      value: Block Shield (1)
+      value: Block Shield
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -376,11 +376,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 436996793186811645, guid: e4ac134936150764f97aac7c4d5eead2, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -1.86
+      value: -2.44
       objectReference: {fileID: 0}
     - target: {fileID: 436996793186811645, guid: e4ac134936150764f97aac7c4d5eead2, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.86
+      value: 0.04
       objectReference: {fileID: 0}
     - target: {fileID: 436996793186811645, guid: e4ac134936150764f97aac7c4d5eead2, type: 3}
       propertyPath: m_LocalPosition.z
@@ -420,7 +420,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4696631248389831294, guid: e4ac134936150764f97aac7c4d5eead2, type: 3}
       propertyPath: m_Name
-      value: Block Shield
+      value: Stretched Block Shield
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
