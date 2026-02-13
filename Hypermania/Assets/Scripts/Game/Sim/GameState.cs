@@ -293,14 +293,14 @@ namespace Game.Sim
                 foreach ((var owners, var collision) in PhysicsCtx.HurtHitCollisions)
                 {
                     //owners[0] hits owners[1]
-                    HandleCollision(collision, config, characters);
-
+                    HitOutcome outcome = HandleCollision(collision, config, characters);
                     var attackerBox = collision.BoxA.Owner == owners.Item1 ? collision.BoxA : collision.BoxB;
                     //to start a rhythm combo, we must sure that the move was not traded
                     if (
                         attackerBox.Data.StartsRhythmCombo
                         && !PhysicsCtx.HurtHitCollisions.ContainsKey((owners.Item2, owners.Item1))
                         && GameMode == GameMode.Fighting
+                        && outcome.Kind == HitKind.Hit
                     )
                     {
                         Frame baseSt = Frame + 10;
@@ -330,15 +330,19 @@ namespace Game.Sim
             PhysicsCtx.Clear();
         }
 
-        private void HandleCollision(Physics<BoxProps>.Collision c, GlobalConfig config, CharacterConfig[] characters)
+        private HitOutcome HandleCollision(
+            Physics<BoxProps>.Collision c,
+            GlobalConfig config,
+            CharacterConfig[] characters
+        )
         {
             if (c.BoxA.Data.Kind == HitboxKind.Hitbox && c.BoxB.Data.Kind == HitboxKind.Hurtbox)
             {
-                Fighters[c.BoxB.Owner].ApplyHit(Frame, c.BoxA.Data, characters[c.BoxB.Owner]);
+                return Fighters[c.BoxB.Owner].ApplyHit(Frame, c.BoxA.Data, characters[c.BoxB.Owner]);
             }
             else if (c.BoxA.Data.Kind == HitboxKind.Hurtbox && c.BoxB.Data.Kind == HitboxKind.Hitbox)
             {
-                Fighters[c.BoxA.Owner].ApplyHit(Frame, c.BoxB.Data, characters[c.BoxA.Owner]);
+                return Fighters[c.BoxA.Owner].ApplyHit(Frame, c.BoxB.Data, characters[c.BoxA.Owner]);
             }
             else if (c.BoxA.Data.Kind == HitboxKind.Hitbox && c.BoxB.Data.Kind == HitboxKind.Hitbox)
             {
@@ -361,6 +365,7 @@ namespace Game.Sim
                     Fighters[c.BoxB.Owner].Position.x -= c.OverlapX / 2;
                 }
             }
+            return new HitOutcome { Kind = HitKind.None };
         }
 
         [ThreadStatic]

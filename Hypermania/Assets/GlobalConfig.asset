@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: GlobalConfig
   m_EditorClassIdentifier: 
   Gravity:
-    rawValue: 3248488448
+    rawValue: 3251109888
   GroundY:
     rawValue: 0
   WallsX:
