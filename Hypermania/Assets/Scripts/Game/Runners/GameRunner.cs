@@ -56,7 +56,9 @@ namespace Game.Runners
             _characters[0] = nytheaConfig;
             _characters[1] = nytheaConfig;
             _curState = GameState.Create(_config, _characters);
-            _view.Init(_characters);
+            _view.Init(_config, _characters);
+            if (_controlsConfig == null)
+                _controlsConfig = ScriptableObject.CreateInstance<ControlsConfig>();
             _inputBuffer = new InputBuffer(_controlsConfig);
             _time = 0;
             _initialized = true;

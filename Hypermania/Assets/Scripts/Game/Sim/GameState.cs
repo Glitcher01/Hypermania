@@ -293,36 +293,25 @@ namespace Game.Sim
                 foreach ((var owners, var collision) in PhysicsCtx.HurtHitCollisions)
                 {
                     //owners[0] hits owners[1]
-                    HandleCollision(collision, config, characters);
-
+                    HitOutcome outcome = HandleCollision(collision, config, characters);
                     var attackerBox = collision.BoxA.Owner == owners.Item1 ? collision.BoxA : collision.BoxB;
                     //to start a rhythm combo, we must sure that the move was not traded
                     if (
                         attackerBox.Data.StartsRhythmCombo
                         && !PhysicsCtx.HurtHitCollisions.ContainsKey((owners.Item2, owners.Item1))
                         && GameMode == GameMode.Fighting
+                        && outcome.Kind == HitKind.Hit
                     )
                     {
-                        // TODO: fix me, 30.72 is hardcoded ticks/beat
-                        // make the start frame always be on a multiple of 4 beats starting from 0
-                        sfloat ticksPerBeat = (sfloat)30.72;
-                        int barInterval = Mathsf.RoundToInt(ticksPerBeat * 4);
                         Frame baseSt = Frame + 10;
-                        Frame stFrame = baseSt - baseSt.No % barInterval + barInterval;
+                        Frame nextBeat = config.Audio.NextBeat(baseSt, AudioConfig.BeatSubdivision.WholeNote);
 
                         for (int i = 0; i < 16; i++)
                         {
-                            Manias[owners.Item1]
-                                .QueueNote(
-                                    i % 4,
-                                    new ManiaNote
-                                    {
-                                        Length = 0,
-                                        Tick = stFrame + Mathsf.RoundToInt(ticksPerBeat / 2 * i),
-                                    }
-                                );
+                            Manias[owners.Item1].QueueNote(i % 4, new ManiaNote { Length = 0, Tick = nextBeat });
+                            nextBeat = config.Audio.NextBeat(nextBeat + 1, AudioConfig.BeatSubdivision.EighthNote);
                         }
-                        Manias[owners.Item1].Enable(stFrame + Mathsf.RoundToInt(ticksPerBeat / 2 * 16));
+                        Manias[owners.Item1].Enable(nextBeat);
                         GameMode = GameMode.Mania;
                         // TODO: show mania screen only after the maximum rollback frames to ensure no visual artifacting
                     }
@@ -341,15 +330,31 @@ namespace Game.Sim
             PhysicsCtx.Clear();
         }
 
-        private void HandleCollision(Physics<BoxProps>.Collision c, GlobalConfig config, CharacterConfig[] characters)
+        private HitOutcome HandleCollision(
+            Physics<BoxProps>.Collision c,
+            GlobalConfig config,
+            CharacterConfig[] characters
+        )
         {
             if (c.BoxA.Data.Kind == HitboxKind.Hitbox && c.BoxB.Data.Kind == HitboxKind.Hurtbox)
             {
-                Fighters[c.BoxB.Owner].ApplyHit(Frame, c.BoxA.Data, characters[c.BoxB.Owner]);
+                return Fighters[c.BoxB.Owner]
+                    .ApplyHit(
+                        Frame,
+                        c.BoxA.Data,
+                        characters[c.BoxB.Owner],
+                        c.BoxB.Box.ClosestPointToCenter(c.BoxA.Box)
+                    );
             }
             else if (c.BoxA.Data.Kind == HitboxKind.Hurtbox && c.BoxB.Data.Kind == HitboxKind.Hitbox)
             {
-                Fighters[c.BoxA.Owner].ApplyHit(Frame, c.BoxB.Data, characters[c.BoxA.Owner]);
+                return Fighters[c.BoxA.Owner]
+                    .ApplyHit(
+                        Frame,
+                        c.BoxB.Data,
+                        characters[c.BoxA.Owner],
+                        c.BoxA.Box.ClosestPointToCenter(c.BoxB.Box)
+                    );
             }
             else if (c.BoxA.Data.Kind == HitboxKind.Hitbox && c.BoxB.Data.Kind == HitboxKind.Hitbox)
             {
@@ -359,19 +364,25 @@ namespace Game.Sim
             }
             else if (c.BoxA.Data.Kind == HitboxKind.Hurtbox && c.BoxB.Data.Kind == HitboxKind.Hurtbox)
             {
-                // TODO: more advanced pushing/hitbox handling, e.g. if someone airborne they shouldn't be able to be
-                // pushed
+                sfloat aPushFactor =
+                    Fighters[c.BoxA.Owner].Location(config) == FighterLocation.Grounded ? (sfloat)1f : (sfloat)0.1f;
+                sfloat bPushFactor =
+                    Fighters[c.BoxB.Owner].Location(config) == FighterLocation.Grounded ? (sfloat)1f : (sfloat)0.1f;
+
+                sfloat aPush = aPushFactor / (aPushFactor + bPushFactor);
+                sfloat bPush = bPushFactor / (aPushFactor + bPushFactor);
                 if (c.BoxA.Box.Pos.x < c.BoxB.Box.Pos.x)
                 {
-                    Fighters[c.BoxA.Owner].Position.x -= c.OverlapX / 2;
-                    Fighters[c.BoxB.Owner].Position.x += c.OverlapX / 2;
+                    Fighters[c.BoxA.Owner].Position.x -= c.OverlapX * aPush;
+                    Fighters[c.BoxB.Owner].Position.x += c.OverlapX * bPush;
                 }
                 else
                 {
-                    Fighters[c.BoxA.Owner].Position.x += c.OverlapX / 2;
-                    Fighters[c.BoxB.Owner].Position.x -= c.OverlapX / 2;
+                    Fighters[c.BoxA.Owner].Position.x += c.OverlapX * aPush;
+                    Fighters[c.BoxB.Owner].Position.x -= c.OverlapX * bPush;
                 }
             }
+            return new HitOutcome { Kind = HitKind.None };
         }
 
         [ThreadStatic]
