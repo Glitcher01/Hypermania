@@ -123,14 +123,13 @@ namespace Game.View
             _params.InfoOverlayView.Render(overlayDetails);
             _params.RoundTimerView.DisplayRoundTimer(state.Frame, state.RoundEnd);
 
-            if (_rollbackStart == Frame.NullFrame)
+            if (_rollbackStart != Frame.NullFrame)
             {
-                throw new InvalidOperationException("rollback start frame cannot be null");
+                _params.SfxManager.InvalidateAndConsume(_rollbackStart, state.Frame);
+                _params.CameraShakeManager.InvalidateAndConsume(_rollbackStart, state.Frame);
+                _params.VfxManager.InvalidateAndConsume(_rollbackStart, state.Frame);
+                _rollbackStart = Frame.NullFrame;
             }
-            _params.SfxManager.InvalidateAndConsume(_rollbackStart, state.Frame);
-            _params.CameraShakeManager.InvalidateAndConsume(_rollbackStart, state.Frame);
-            _params.VfxManager.InvalidateAndConsume(_rollbackStart, state.Frame);
-            _rollbackStart = Frame.NullFrame;
         }
 
         public void RollbackRender(in GameState state)
