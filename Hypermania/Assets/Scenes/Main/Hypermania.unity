@@ -233,6 +233,7 @@ MonoBehaviour:
   _view: {fileID: 2114326934}
   _config: {fileID: 11400000, guid: 097b22ad0bf6d4d8fab37f2f2510eefb, type: 2}
   _drawHitboxes: 1
+  _controlsConfig: {fileID: 0}
 --- !u!4 &286925406
 Transform:
   m_ObjectHideFlags: 0
@@ -437,6 +438,7 @@ MonoBehaviour:
   _view: {fileID: 2114326934}
   _config: {fileID: 11400000, guid: 097b22ad0bf6d4d8fab37f2f2510eefb, type: 2}
   _drawHitboxes: 1
+  _controlsConfig: {fileID: 0}
 --- !u!1001 &816475678
 PrefabInstance:
   m_ObjectHideFlags: 0
