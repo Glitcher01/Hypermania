@@ -65,7 +65,10 @@ public sealed class NoFloatDoubleInGameSimAnalyzer : DiagnosticAnalyzer
     private static bool IsInTargetNamespace(ISymbol symbol)
     {
         var ns = symbol.ContainingNamespace?.ToDisplayString() ?? "";
-        return ns == "Game.Sim" || ns.StartsWith("Game.Sim.") || ns == "Design.Configs" || ns.StartsWith("Design.Configs.");
+        return ns == "Game.Sim"
+            || ns.StartsWith("Game.Sim.")
+            || ns == "Design.Configs"
+            || ns.StartsWith("Design.Configs.");
     }
 
     private static bool IsInTargetNamespace(OperationAnalysisContext context, SyntaxNode node)
