@@ -25,6 +25,10 @@ MonoBehaviour:
     rawValue: 1120403456
   BurstMax:
     rawValue: 1112014848
+  ForwardDashDistance:
+    rawValue: 1110704128
+  BackDashDistance:
+    rawValue: 1109393408
   NumAirDashes: 2
   Hitboxes:
     values:
@@ -40,6 +44,7 @@ MonoBehaviour:
     - {fileID: 0}
     - {fileID: 0}
     - {fileID: 11400000, guid: 0d95c1ae31236b6b8a26cd6e3243d85c, type: 2}
+    - {fileID: 0}
     - {fileID: 0}
     - {fileID: 0}
     - {fileID: 0}

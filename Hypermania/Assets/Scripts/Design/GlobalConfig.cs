@@ -13,6 +13,12 @@ namespace Design
         public sfloat GroundY = -3;
         public sfloat WallsX = 4;
         public int ClankTicks = 30;
+        public int ForwardDashCancelAfterTicks = 2;
+        public int ForwardDashTicks = 5;
+        public int BackDashCancelAfterTicks = 6;
+        public int BackDashTicks = 15;
+
+        public sfloat RunningSpeedMultiplier = 2;
         public int RoundTimeTicks = 10800;
 
         [SerializeField]

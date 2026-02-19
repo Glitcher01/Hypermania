@@ -18,6 +18,8 @@ namespace Design
         public sfloat JumpVelocity;
         public sfloat Health;
         public sfloat BurstMax;
+        public sfloat ForwardDashDistance;
+        public sfloat BackDashDistance;
         public int NumAirDashes;
         public EnumArray<CharacterState, HitboxData> Hitboxes;
 

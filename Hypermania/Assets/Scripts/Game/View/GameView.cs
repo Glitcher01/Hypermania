@@ -147,6 +147,7 @@ namespace Game.View
             // TODO: refactor me, im thinking some listener pattern
             for (int i = 0; i < _characters.Length; i++)
             {
+                _fighters[i].RollbackRender(state.Frame, state.Fighters[i], _params.VfxManager, _params.SfxManager);
                 if (state.Fighters[i].State == CharacterState.Hit && state.Frame == state.Fighters[i].StateStart)
                 {
                     _params.SfxManager.AddDesired(
@@ -174,26 +175,6 @@ namespace Game.View
                             }
                         );
                     }
-                }
-                if (
-                    state.Fighters[i].State == CharacterState.BlockCrouch
-                    || state.Fighters[i].State == CharacterState.BlockStand
-                        && state.Frame == state.Fighters[i].StateStart
-                )
-                {
-                    _params.VfxManager.AddDesired(
-                        new ViewEvent<VfxEvent>
-                        {
-                            Event = new VfxEvent
-                            {
-                                Kind = VfxKind.Block,
-                                KnockbackVector = (Vector2)state.Fighters[i].HitProps.Knockback,
-                                Position = (Vector2)state.Fighters[i].HitLocation,
-                            },
-                            StartFrame = state.Frame,
-                            Hash = i,
-                        }
-                    );
                 }
             }
         }

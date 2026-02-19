@@ -1,6 +1,9 @@
 using Design;
 using Game.Sim;
+using Game.View.Events;
+using Game.View.Events.Vfx;
 using UnityEngine;
+using UnityEngine.VFX;
 using Utils;
 
 namespace Game.View.Fighters
@@ -11,6 +14,9 @@ namespace Game.View.Fighters
         private Animator _animator;
         private CharacterConfig _characterConfig;
         private RuntimeAnimatorController _oldController;
+
+        [SerializeField]
+        private Transform _dustEmitterLocation;
 
         public virtual void Awake()
         {
@@ -49,6 +55,57 @@ namespace Game.View.Fighters
 
             _animator.Play(animation.ToString(), 0, (float)ticks / totalTicks);
             _animator.Update(0f); // force pose evaluation this frame while paused
+        }
+
+        public virtual void RollbackRender(
+            Frame frame,
+            in FighterState state,
+            VfxManager vfxManager,
+            SfxManager sfxManager
+        )
+        {
+            if (
+                state.State == CharacterState.BlockCrouch
+                || state.State == CharacterState.BlockStand && frame == state.StateStart
+            )
+            {
+                vfxManager.AddDesired(
+                    new ViewEvent<VfxEvent>
+                    {
+                        Event = new VfxEvent
+                        {
+                            Kind = VfxKind.Block,
+                            Direction = (Vector2)state.HitProps.Knockback,
+                            Position = (Vector2)state.HitLocation,
+                        },
+                        StartFrame = frame,
+                        Hash = 0, // can't be more than one block per character on a frame?
+                    }
+                );
+            }
+            if (
+                (state.State == CharacterState.BackDash || state.State == CharacterState.ForwardDash)
+                && frame == state.StateStart
+            )
+            {
+                Vector2 dir = (Vector2)(
+                    state.State == CharacterState.ForwardDash ? state.ForwardVector : state.BackwardVector
+                );
+
+                vfxManager.AddDesired(
+                    new ViewEvent<VfxEvent>
+                    {
+                        Event = new VfxEvent
+                        {
+                            Kind = VfxKind.DashDust,
+                            Direction = dir,
+                            Position = (Vector2)state.Position + dir * _dustEmitterLocation.localPosition.x,
+                        },
+                        StartFrame = frame,
+                        Hash = 0,
+                    }
+                );
+            }
         }
 
         public void DeInit()

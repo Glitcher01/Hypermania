@@ -28,6 +28,7 @@ namespace Game
         Burst = 21,
         BlockStand = 22,
         BlockCrouch = 23,
+        Running = 24,
     }
 
     [Serializable]

@@ -26,11 +26,11 @@ namespace Design
             { InputFlags.HeavyAttack, Key.L },
             { InputFlags.SpecialAttack, Key.I },
             { InputFlags.Burst, Key.O },
-            { InputFlags.Mania1, Key.A },
-            { InputFlags.Mania2, Key.S },
-            { InputFlags.Mania3, Key.D },
-            { InputFlags.Mania4, Key.J },
-            { InputFlags.Mania5, Key.K },
+            { InputFlags.Mania1, Key.D },
+            { InputFlags.Mania2, Key.J },
+            { InputFlags.Mania3, Key.S },
+            { InputFlags.Mania4, Key.K },
+            { InputFlags.Mania5, Key.A },
             { InputFlags.Mania6, Key.L },
         };
 
