@@ -28,6 +28,7 @@ namespace Design.Configs
         public int BackDashTicks = 15;
         public int BackAirDashTicks = 15;
         public sfloat RunningSpeedMultiplier = 2;
+        public sfloat SuperJumpMultiplier = (sfloat)1.25f;
         public int RoundTimeTicks = 10800;
 
         [SerializeField]

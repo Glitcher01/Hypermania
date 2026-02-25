@@ -130,7 +130,7 @@ namespace Game.Sim
             // This function internally appies changes to the fighter's velocity based on movement inputs
             for (int i = 0; i < Fighters.Length; i++)
             {
-                Fighters[i].ApplyMovementIntent(Frame, characters[i], config);
+                Fighters[i].ApplyMovementState(Frame, characters[i], config);
             }
 
             // If a player applies inputs to start a state at the start of the frame, we should apply those immediately
@@ -195,11 +195,6 @@ namespace Game.Sim
             for (int i = 0; i < Fighters.Length; i++)
             {
                 Fighters[i].FaceTowards(Fighters[i ^ 1].Position);
-            }
-            // Apply and change the state that derives only from passive factors (movements, etc)
-            for (int i = 0; i < Fighters.Length; i++)
-            {
-                Fighters[i].ApplyMovementState(Frame, config);
             }
         }
 
