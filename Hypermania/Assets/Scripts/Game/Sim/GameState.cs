@@ -1,9 +1,12 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Data;
+using System.Diagnostics;
 using System.Linq;
-using Design;
 using Design.Animation;
+using Design.Configs;
+using Game.View.Overlay;
 using MemoryPack;
 using Netcode.Rollback;
 using UnityEngine;
@@ -16,60 +19,40 @@ namespace Game.Sim
     {
         Fighting,
         Mania,
+        RoundEnd, // Used to be roundStart, indicates the end of a round
+        Countdown, // Countdown to round.
     }
 
     [MemoryPackable]
     public partial class GameState : IState<GameState>
     {
         /// <summary>
-        /// Physics context used to find collisions between boxes.
+        /// Physics context used to resolve collisions between boxes.
         /// </summary>
         [ThreadStatic]
-        private static Physics<BoxProps> _physics;
-        private static Physics<BoxProps> Physics
+        private static PhysicsContext<BoxProps> _physicsCtx;
+        private static PhysicsContext<BoxProps> PhysicsCtx
         {
             get
             {
-                if (_physics == null)
-                    _physics = new Physics<BoxProps>(MAX_COLLIDERS);
-                return _physics;
-            }
-        }
-
-        /// <summary>
-        /// Cached list used to sort and process collisions, cleared at the end of every frame
-        /// </summary>
-        [ThreadStatic]
-        private static List<Physics<BoxProps>.Collision> _collisions;
-        private static List<Physics<BoxProps>.Collision> Collisions
-        {
-            get
-            {
-                if (_collisions == null)
-                    _collisions = new List<Physics<BoxProps>.Collision>(MAX_COLLIDERS);
-                return _collisions;
-            }
-        }
-
-        [ThreadStatic]
-        private static Dictionary<(int, int), Physics<BoxProps>.Collision> _hurtHitCollisions;
-        private static Dictionary<(int, int), Physics<BoxProps>.Collision> HurtHitCollisions
-        {
-            get
-            {
-                if (_hurtHitCollisions == null)
-                    _hurtHitCollisions = new Dictionary<(int, int), Physics<BoxProps>.Collision>(MAX_COLLIDERS);
-                return _hurtHitCollisions;
+                if (_physicsCtx == null)
+                    _physicsCtx = new PhysicsContext<BoxProps>(MAX_COLLIDERS);
+                return _physicsCtx;
             }
         }
 
         [MemoryPackIgnore]
         public const int MAX_COLLIDERS = 100;
 
-        public Frame Frame;
+        public Frame RealFrame; // network/music frame
+        public Frame SimFrame; // Game sim frame
+        public Frame RoundStart; // Added to indicate when a round starts.
+        public Frame RoundEnd;
         public FighterState[] Fighters;
         public ManiaState[] Manias;
+        public sfloat HypeMeter;
         public GameMode GameMode;
+        public int HitstopFramesRemaining;
 
         /// <summary>
         /// Use this static builder instead of the constructor for creating new GameStates. This is because MemoryPack,
@@ -78,28 +61,63 @@ namespace Game.Sim
         /// </summary>
         /// <param name="characterConfigs">Character configs to use</param>
         /// <returns>The created GameState</returns>
-        public static GameState Create(CharacterConfig[] characters)
+        public static GameState Create(GlobalConfig config, CharacterConfig[] characters)
         {
-            GameState state = new GameState();
-            state.Frame = Frame.FirstFrame;
-            state.Fighters = new FighterState[characters.Length];
-            state.Manias = new ManiaState[characters.Length];
-            state.GameMode = GameMode.Fighting;
+            GameState state = new GameState
+            {
+                RealFrame = Frame.FirstFrame,
+                SimFrame = Frame.FirstFrame,
+                RoundStart = Frame.FirstFrame,
+                RoundEnd = new Frame(config.RoundTimeTicks),
+                Fighters = new FighterState[characters.Length],
+                Manias = new ManiaState[characters.Length],
+                HitstopFramesRemaining = 0,
+                HypeMeter = (sfloat)0f,
+                GameMode = GameMode.Countdown,
+            };
             for (int i = 0; i < characters.Length; i++)
             {
-                sfloat xPos = i - ((sfloat)characters.Length - 1) / 2;
+                sfloat xPos = (i - ((sfloat)characters.Length - 1) / 2) * 4;
                 FighterFacing facing = xPos > 0 ? FighterFacing.Left : FighterFacing.Right;
-                state.Fighters[i] = FighterState.Create(new SVector2(xPos, sfloat.Zero), facing, characters[i]);
+                state.Fighters[i] = FighterState.Create(new SVector2(xPos, sfloat.Zero), facing, characters[i], 3);
                 state.Manias[i] = ManiaState.Create(
                     new ManiaConfig
                     {
                         NumKeys = 4,
-                        HitHalfRange = 8,
-                        MissHalfRange = 6,
+                        HitHalfRange = config.Input.BeatCancelWindow,
+                        MissHalfRange = config.Input.BeatCancelWindow + 3,
                     }
                 );
             }
             return state;
+        }
+
+        private void DoRoundEnd(CharacterConfig[] characters, Span<GameInput> outInputs)
+        {
+            for (int i = 0; i < Fighters.Length; i++)
+            {
+                Fighters[i].Health = characters[i].Health;
+                sfloat xPos = (i - ((sfloat)characters.Length - 1) / 2) * 4;
+                FighterFacing facing = xPos > 0 ? FighterFacing.Left : FighterFacing.Right;
+                Fighters[i].RoundReset(new SVector2(xPos, sfloat.Zero), facing, characters[i]);
+                outInputs[i] = GameInput.None;
+            }
+            HypeMeter = (sfloat)0.0f;
+            RoundStart = SimFrame;
+            GameMode = GameMode.Countdown;
+        }
+
+        private void DoCountdown(GlobalConfig config, Span<GameInput> outInputs)
+        {
+            if (SimFrame - RoundStart >= config.RoundCountdownTicks) // Added an attribute to config for countdown.
+            {
+                GameMode = GameMode.Fighting;
+                RoundEnd = SimFrame + config.RoundTimeTicks;
+            }
+            for (int i = 0; i < Fighters.Length; i++)
+            {
+                outInputs[i] = GameInput.None;
+            }
         }
 
         public void Advance(
@@ -108,58 +126,115 @@ namespace Game.Sim
             GlobalConfig config
         )
         {
+            RealFrame += 1;
             if (inputs.Length != characters.Length || characters.Length != Fighters.Length)
             {
                 throw new InvalidOperationException("invalid inputs and characters to advance game state with");
             }
-            Frame += 1;
+
+            Span<GameInput> remapInputs = stackalloc GameInput[Fighters.Length];
+            if (GameMode == GameMode.RoundEnd)
+            {
+                DoRoundEnd(characters, remapInputs);
+            }
+            else if (GameMode == GameMode.Countdown)
+            {
+                DoCountdown(config, remapInputs);
+            }
+            else if (GameMode == GameMode.Mania)
+            {
+                DoManiaStep(inputs, remapInputs);
+            }
+            else if (GameMode == GameMode.Fighting)
+            {
+                for (int i = 0; i < Fighters.Length; i++)
+                {
+                    remapInputs[i] = inputs[i].input;
+                }
+            }
 
             // Push the current input into the input history, to read for buffering.
             for (int i = 0; i < Fighters.Length; i++)
             {
-                Fighters[i].InputH.PushInput(inputs[i].input);
+                Fighters[i].InputH.PushInput(remapInputs[i]);
+            }
+            // if hitstop, only grab inputs and return
+            if (HitstopFramesRemaining >= 0)
+            {
+                HitstopFramesRemaining--;
+                return;
+            }
+            SimFrame += 1;
+
+            for (int i = 0; i < Fighters.Length; i++)
+            {
+                Fighters[i].DoFrameStart(config);
             }
 
             // Tick the state machine, making the character idle if an animation/stun finishes
             for (int i = 0; i < Fighters.Length; i++)
             {
-                Fighters[i].TickStateMachine(Frame);
+                Fighters[i].TickStateMachine(SimFrame);
             }
 
-            if (GameMode == GameMode.Fighting)
+            // This function internally appies changes to the fighter's velocity based on movement inputs
+            for (int i = 0; i < Fighters.Length; i++)
             {
-                // This function internally appies changes to the fighter's velocity based on movement inputs
-                for (int i = 0; i < Fighters.Length; i++)
-                {
-                    Fighters[i].ApplyMovementIntent(Frame, characters[i], config);
-                }
-                // If a player applies inputs to start a state at the start of the frame, we should apply those immediately
-                for (int i = 0; i < Fighters.Length; i++)
-                {
-                    Fighters[i].ApplyActiveState(Frame, characters[i], config);
-                }
+                Fighters[i].ApplyMovementState(SimFrame, characters[i], config);
             }
-            else if (GameMode == GameMode.Mania)
-            {
-                for (int i = 0; i < Manias.Length; i++)
-                {
-                    List<ManiaEvent> maniaEvents = new List<ManiaEvent>();
-                    Manias[i].Tick(Frame, inputs[i].input, maniaEvents);
-                    // TODO: make note hits do something to the character here
 
-                    foreach (ManiaEvent ev in maniaEvents)
-                    {
-                        switch (ev.Kind)
-                        {
-                            case ManiaEventKind.End:
-                                GameMode = GameMode.Fighting;
-                                break;
-                        }
-                    }
-                }
+            // If a player applies inputs to start a state at the start of the frame, we should apply those immediately
+            for (int i = 0; i < Fighters.Length; i++)
+            {
+                Fighters[i].ApplyActiveState(SimFrame, RealFrame, characters[i], config);
             }
 
             DoCollisionStep(characters, config);
+
+            if (SimFrame == RoundEnd)
+            {
+                RoundEnd = SimFrame + config.RoundTimeTicks;
+                //TODO: Properly handle edge case where player health is equal. Currently player 1 wins by default.
+                if (Fighters[0].Health < Fighters[1].Health)
+                {
+                    Fighters[0].Health = 0;
+                }
+                else
+                {
+                    Fighters[1].Health = 0;
+                }
+            }
+
+            for (int i = 0; i < Fighters.Length; i++)
+            {
+                if (Fighters[i].Health <= 0)
+                {
+                    Fighters[i].Lives--;
+                    if (Fighters[i].Lives <= 0)
+                    {
+                        return;
+                    }
+
+                    // Decide what victory indicator to give.
+                    if (Fighters[1 - i].Health == characters[i].Health)
+                    {
+                        Fighters[1 - i].Victories[Fighters[1 - i].amountVictories] = VictoryKind.Perfect;
+                    }
+                    else
+                    {
+                        Fighters[1 - i].Victories[Fighters[1 - i].amountVictories] = VictoryKind.Normal;
+                    }
+
+                    Fighters[1 - i].amountVictories++;
+                    GameMode = GameMode.RoundEnd;
+                    // Ensure that if the player died to a mania attack it ends immediately
+                    for (int j = 0; j < Manias.Length; j++)
+                    {
+                        Manias[j].End();
+                    }
+                    return;
+                }
+            }
 
             // Apply any velocities set during movement or through knockback.
             for (int i = 0; i < Fighters.Length; i++)
@@ -167,20 +242,58 @@ namespace Game.Sim
                 Fighters[i].UpdatePosition(config);
             }
 
+            // Update hype if they are holding forward
+            for (int i = 0; i < Fighters.Length; i++)
+            {
+                if (Fighters[i].InputH.IsHeld(Fighters[i].ForwardInput))
+                {
+                    UpdateHype(config, i, config.HypeMovementFactor);
+                }
+            }
+
             // If the fighter is now on the ground, apply aerial cancels
             for (int i = 0; i < Fighters.Length; i++)
             {
-                Fighters[i].ApplyAerialCancel(Frame, config);
+                Fighters[i].ApplyAerialCancel(SimFrame, config);
             }
 
             for (int i = 0; i < Fighters.Length; i++)
             {
                 Fighters[i].FaceTowards(Fighters[i ^ 1].Position);
             }
-            // Apply and change the state that derives only from passive factors (movements, etc)
+        }
+
+        public bool FightersDead()
+        {
             for (int i = 0; i < Fighters.Length; i++)
             {
-                Fighters[i].ApplyMovementState(Frame, config);
+                if (Fighters[i].Lives <= 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void DoManiaStep((GameInput input, InputStatus status)[] inputs, Span<GameInput> outInputs)
+        {
+            for (int i = 0; i < Manias.Length; i++)
+            {
+                List<ManiaEvent> maniaEvents = new List<ManiaEvent>();
+                Manias[i].Tick(RealFrame, inputs[i].input, maniaEvents);
+
+                foreach (ManiaEvent ev in maniaEvents)
+                {
+                    switch (ev.Kind)
+                    {
+                        case ManiaEventKind.End:
+                            GameMode = GameMode.Fighting;
+                            break;
+                        case ManiaEventKind.Hit:
+                            outInputs[i].Flags |= ev.Note.HitInput;
+                            break;
+                    }
+                }
             }
         }
 
@@ -190,12 +303,12 @@ namespace Game.Sim
             // collisions. It is our job to then handle them.
             for (int i = 0; i < Fighters.Length; i++)
             {
-                Fighters[i].AddBoxes(Frame, characters[i], Physics, i);
+                Fighters[i].AddBoxes(SimFrame, characters[i], PhysicsCtx.Physics, i);
             }
 
             // AdvanceProjectiles();
 
-            Physics.GetCollisions(Collisions);
+            PhysicsCtx.Physics.GetCollisions(PhysicsCtx.Collisions);
 
             // First, solve collisions that would result in player damage. There can only be one such collision per
             // (A, B) ordered pair, where A and B are players, projectiles, or other game objects. For now, we take the
@@ -209,7 +322,7 @@ namespace Game.Sim
             // colliding. If they are, push them apart.
             Physics<BoxProps>.Collision? clank = null;
             Physics<BoxProps>.Collision? collide = null;
-            foreach (var c in Collisions)
+            foreach (var c in PhysicsCtx.Collisions)
             {
                 (int, int) hitPair = (-1, -1);
                 if (c.BoxA.Data.Kind == HitboxKind.Hitbox && c.BoxB.Data.Kind == HitboxKind.Hurtbox)
@@ -231,29 +344,48 @@ namespace Game.Sim
                 // TODO: sort by priority or something
                 if (hitPair != (-1, -1))
                 {
-                    HurtHitCollisions[hitPair] = c;
+                    PhysicsCtx.HurtHitCollisions[hitPair] = c;
                 }
             }
 
-            if (HurtHitCollisions.Count > 0)
+            if (PhysicsCtx.HurtHitCollisions.Count > 0)
             {
-                foreach ((var owners, var collision) in HurtHitCollisions)
+                // sort for determinism
+                var collisions = PhysicsCtx.HurtHitCollisions.ToList();
+                collisions.Sort(
+                    (a, b) =>
+                    {
+                        if (a.Key.Item1 == b.Key.Item1)
+                            return a.Key.Item2 - b.Key.Item2;
+                        return a.Key.Item1 - b.Key.Item1;
+                    }
+                );
+
+                foreach ((var owners, var collision) in collisions)
                 {
                     //owners[0] hits owners[1]
-                    HandleCollision(collision, config);
+                    HitOutcome outcome = HandleCollision(collision, config, characters);
+
+                    HitstopFramesRemaining = Mathsf.Max(outcome.Props.HitstopTicks, HitstopFramesRemaining);
+
+                    var attackerBox = collision.BoxA.Owner == owners.Item1 ? collision.BoxA : collision.BoxB;
+
+                    if (outcome.Kind == HitKind.Hit)
+                    {
+                        sfloat damage = outcome.Props.Damage;
+                        UpdateHype(config, attackerBox.Owner, damage);
+                    }
 
                     //to start a rhythm combo, we must sure that the move was not traded
                     if (
-                        collision.BoxA.Data.StartsRhythmCombo
-                        && !HurtHitCollisions.ContainsKey((owners.Item2, owners.Item1))
+                        attackerBox.Data.StartsRhythmCombo
+                        && !PhysicsCtx.HurtHitCollisions.ContainsKey((owners.Item2, owners.Item1))
+                        && GameMode == GameMode.Fighting
+                        && outcome.Kind == HitKind.Hit
                     )
                     {
-                        // TODO: fix me, 30.72 is hardcoded ticks/beat
-                        // make the start frame always be on a multiple of 4 beats starting from 0
-                        sfloat ticksPerBeat = (sfloat)30.72;
-                        int barInterval = Mathsf.RoundToInt(ticksPerBeat * 4);
-                        Frame baseSt = Frame + 10;
-                        Frame stFrame = baseSt - baseSt.No % barInterval + barInterval;
+                        Frame baseSt = RealFrame + 10;
+                        Frame nextBeat = config.Audio.NextBeat(baseSt, AudioConfig.BeatSubdivision.WholeNote);
 
                         for (int i = 0; i < 16; i++)
                         {
@@ -262,63 +394,98 @@ namespace Game.Sim
                                     i % 4,
                                     new ManiaNote
                                     {
-                                        Id = i,
                                         Length = 0,
-                                        Tick = stFrame + Mathsf.RoundToInt(ticksPerBeat / 2 * i),
+                                        Tick = nextBeat,
+                                        HitInput = InputFlags.MediumAttack,
                                     }
                                 );
+                            nextBeat = config.Audio.NextBeat(nextBeat + 1, AudioConfig.BeatSubdivision.QuarterNote);
                         }
-                        Manias[owners.Item1].Enable(stFrame + Mathsf.RoundToInt(ticksPerBeat / 2 * 16));
+                        Manias[owners.Item1].Enable(nextBeat);
                         GameMode = GameMode.Mania;
+                        // TODO: show mania screen only after the maximum rollback frames to ensure no visual artifacting
                     }
                 }
             }
             else if (clank.HasValue)
             {
-                HandleCollision(clank.Value, config);
+                HandleCollision(clank.Value, config, characters);
             }
             else if (collide.HasValue)
             {
-                HandleCollision(collide.Value, config);
+                HandleCollision(collide.Value, config, characters);
             }
 
             // Clear the physics context for the next frame, which will then re-add boxes and solve for collisions again
-            Physics.Clear();
-            Collisions.Clear();
-            HurtHitCollisions.Clear();
+            PhysicsCtx.Clear();
         }
 
-        private void HandleCollision(Physics<BoxProps>.Collision c, GlobalConfig config)
+        private void UpdateHype(GlobalConfig config, int handle, sfloat damage)
+        {
+            if (handle == 0)
+            {
+                HypeMeter += damage;
+            }
+            else
+            {
+                HypeMeter -= damage;
+            }
+            HypeMeter = Mathsf.Clamp(HypeMeter, -config.MaxHype, config.MaxHype);
+        }
+
+        private HitOutcome HandleCollision(
+            Physics<BoxProps>.Collision c,
+            GlobalConfig config,
+            CharacterConfig[] characters
+        )
         {
             if (c.BoxA.Data.Kind == HitboxKind.Hitbox && c.BoxB.Data.Kind == HitboxKind.Hurtbox)
             {
-                Fighters[c.BoxB.Owner].ApplyHit(Frame, c.BoxA.Data);
+                return Fighters[c.BoxB.Owner]
+                    .ApplyHit(
+                        SimFrame,
+                        c.BoxA.Data,
+                        characters[c.BoxB.Owner],
+                        c.BoxB.Box.ClosestPointToCenter(c.BoxA.Box)
+                    );
             }
             else if (c.BoxA.Data.Kind == HitboxKind.Hurtbox && c.BoxB.Data.Kind == HitboxKind.Hitbox)
             {
-                Fighters[c.BoxA.Owner].ApplyHit(Frame, c.BoxB.Data);
+                return Fighters[c.BoxA.Owner]
+                    .ApplyHit(
+                        SimFrame,
+                        c.BoxB.Data,
+                        characters[c.BoxA.Owner],
+                        c.BoxA.Box.ClosestPointToCenter(c.BoxB.Box)
+                    );
             }
             else if (c.BoxA.Data.Kind == HitboxKind.Hitbox && c.BoxB.Data.Kind == HitboxKind.Hitbox)
             {
                 // TODO: check if moves are allowed to clank
-                Fighters[c.BoxA.Owner].ApplyClank(Frame, config);
-                Fighters[c.BoxB.Owner].ApplyClank(Frame, config);
+                Fighters[c.BoxA.Owner].ApplyClank(SimFrame, config);
+                Fighters[c.BoxB.Owner].ApplyClank(SimFrame, config);
             }
             else if (c.BoxA.Data.Kind == HitboxKind.Hurtbox && c.BoxB.Data.Kind == HitboxKind.Hurtbox)
             {
-                // TODO: more advanced pushing/hitbox handling, e.g. if someone airborne they shouldn't be able to be
-                // pushed
+                sfloat aPushFactor =
+                    Fighters[c.BoxA.Owner].Location(config) == FighterLocation.Grounded ? (sfloat)1f : (sfloat)0.1f;
+                sfloat bPushFactor =
+                    Fighters[c.BoxB.Owner].Location(config) == FighterLocation.Grounded ? (sfloat)1f : (sfloat)0.1f;
+
+                sfloat aPush = aPushFactor / (aPushFactor + bPushFactor);
+                sfloat bPush = bPushFactor / (aPushFactor + bPushFactor);
                 if (c.BoxA.Box.Pos.x < c.BoxB.Box.Pos.x)
                 {
-                    Fighters[c.BoxA.Owner].Position.x -= c.OverlapX / 2;
-                    Fighters[c.BoxB.Owner].Position.x += c.OverlapX / 2;
+                    Fighters[c.BoxA.Owner].Position.x -= c.OverlapX * aPush;
+                    Fighters[c.BoxB.Owner].Position.x += c.OverlapX * bPush;
                 }
                 else
                 {
-                    Fighters[c.BoxA.Owner].Position.x += c.OverlapX / 2;
-                    Fighters[c.BoxB.Owner].Position.x -= c.OverlapX / 2;
+                    Fighters[c.BoxA.Owner].Position.x += c.OverlapX * aPush;
+                    Fighters[c.BoxB.Owner].Position.x -= c.OverlapX * bPush;
                 }
             }
+            return new HitOutcome { Kind = HitKind.None };
         }
 
         [ThreadStatic]

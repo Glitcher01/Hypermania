@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Utils.SoftFloat;
 
 namespace Design.Animation
 {
@@ -12,29 +13,49 @@ namespace Design.Animation
     }
 
     [Serializable]
+    public enum AttackKind
+    {
+        Medium,
+        Overhead,
+        Low,
+    }
+
+    [Serializable]
     public struct BoxProps : IEquatable<BoxProps>
     {
+        // NOTE: ensure that any new fields added above are added to the equals and hashcode implementation!!!
         public HitboxKind Kind;
-
+        public AttackKind AttackKind;
         public int Damage;
         public int HitstunTicks;
         public int BlockstunTicks;
+        public int HitstopTicks;
         public bool StartsRhythmCombo;
-        public Vector2 Knockback;
+        public SVector2 Knockback;
 
-        // NOTE: ensure that any new fields added above are added to the equals implementation: otherwise they will not
-        // be editable in the move builder
         public bool Equals(BoxProps other) =>
             Kind == other.Kind
+            && AttackKind == other.AttackKind
             && HitstunTicks == other.HitstunTicks
             && Damage == other.Damage
             && BlockstunTicks == other.BlockstunTicks
             && Knockback == other.Knockback
-            && StartsRhythmCombo == other.StartsRhythmCombo;
+            && StartsRhythmCombo == other.StartsRhythmCombo
+            && HitstopTicks == other.HitstopTicks;
 
         public override bool Equals(object obj) => obj is BoxProps other && Equals(other);
 
-        public override int GetHashCode() => HashCode.Combine(Kind, HitstunTicks);
+        public override int GetHashCode() =>
+            HashCode.Combine(
+                Kind,
+                AttackKind,
+                HitstunTicks,
+                Damage,
+                BlockstunTicks,
+                StartsRhythmCombo,
+                Knockback,
+                HitstopTicks
+            );
 
         public static bool operator ==(BoxProps a, BoxProps b) => a.Equals(b);
 
@@ -46,8 +67,8 @@ namespace Design.Animation
     {
         public string Name;
 
-        public Vector2 CenterLocal;
-        public Vector2 SizeLocal;
+        public SVector2 CenterLocal;
+        public SVector2 SizeLocal;
         public BoxProps Props;
 
         public bool Equals(BoxData other)
@@ -70,13 +91,57 @@ namespace Design.Animation
         public static bool operator !=(BoxData left, BoxData right) => !left.Equals(right);
     }
 
+    public enum FrameType
+    {
+        Neutral,
+        Startup,
+        Active,
+        Recovery,
+        Hitstun,
+        Blockstun,
+    }
+
     [Serializable]
     public class FrameData
     {
         public List<BoxData> Boxes = new List<BoxData>();
+        public FrameType FrameType = FrameType.Neutral;
+
+        public FrameData Clone()
+        {
+            var copy = new FrameData();
+
+            if (Boxes != null)
+                copy.Boxes = new List<BoxData>(Boxes);
+            else
+                copy.Boxes = new List<BoxData>();
+
+            copy.FrameType = FrameType;
+            return copy;
+        }
+
+        public void CopyFrom(FrameData other)
+        {
+            Boxes.Clear();
+            if (other?.Boxes != null)
+                Boxes.AddRange(other.Boxes);
+            FrameType = other.FrameType;
+        }
+
+        public override int GetHashCode()
+        {
+            var hc = new HashCode();
+            hc.Add(Boxes != null ? Boxes.Count : 0);
+            for (int j = 0; j < Boxes.Count; j++)
+            {
+                hc.Add(Boxes[j]);
+            }
+            hc.Add(FrameType);
+            return hc.ToHashCode();
+        }
     }
 
-    [CreateAssetMenu(menuName = "Hypermania/Character Animation Hitbox Data")]
+    [CreateAssetMenu(menuName = "Hypermania/Move Data")]
     [Serializable]
     public class HitboxData : ScriptableObject
     {
@@ -98,11 +163,28 @@ namespace Design.Animation
 
         public FrameData GetFrame(int tick)
         {
-            if (tick < 0 || tick >= TotalTicks)
-            {
+            if (Frames == null || Frames.Count == 0)
                 return null;
-            }
+            tick = Mathf.Clamp(tick, 0, TotalTicks - 1);
             return Frames[tick];
+        }
+
+        public override int GetHashCode()
+        {
+            var hc = new HashCode();
+
+            hc.Add(Clip ? Clip.GetInstanceID() : 0);
+            hc.Add(Frames != null ? Frames.Count : 0);
+
+            if (Frames != null)
+            {
+                for (int i = 0; i < Frames.Count; i++)
+                {
+                    hc.Add(Frames[i]);
+                }
+            }
+
+            return hc.ToHashCode();
         }
     }
 }

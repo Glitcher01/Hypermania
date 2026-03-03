@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
@@ -44,7 +45,7 @@ namespace Utils.EnumArray
 
             EditorGUI.indentLevel++;
 
-            Type enumType = GetEnumType(property);
+            Type enumType = GetEnumTypeFromDrawerField();
             if (enumType == null || !enumType.IsEnum)
             {
                 EditorGUI.indentLevel--;
@@ -61,9 +62,12 @@ namespace Utils.EnumArray
                 return;
             }
 
-            EnsureArraySize(valuesProp, enumType);
+            // Ensure array size using shared cache Count
+            int n = GetCacheCount(enumType);
+            if (valuesProp.arraySize != n)
+                valuesProp.arraySize = n;
 
-            string[] names = Enum.GetNames(enumType);
+            string[] names = GetCacheNames(enumType);
 
             float y = position.y + EditorGUIUtility.singleLineHeight + 2f;
             for (int i = 0; i < valuesProp.arraySize; i++)
@@ -82,30 +86,26 @@ namespace Utils.EnumArray
             EditorGUI.indentLevel--;
         }
 
-        private static void EnsureArraySize(SerializedProperty valuesProp, Type enumType)
+        private Type GetEnumTypeFromDrawerField()
         {
-            int n = Enum.GetNames(enumType).Length;
-            if (valuesProp.arraySize != n)
-                valuesProp.arraySize = n;
-        }
-
-        private static Type GetEnumType(SerializedProperty property)
-        {
-            // fieldInfo is the EnumArray<TEnum, TValue> field; extract TEnum
-            var t = property.serializedObject.targetObject.GetType();
-            var fi = t.GetField(
-                property.propertyPath.Split('.')[0],
-                System.Reflection.BindingFlags.Instance
-                    | System.Reflection.BindingFlags.Public
-                    | System.Reflection.BindingFlags.NonPublic
-            );
-            if (fi == null)
-                return null;
-
-            var ft = fi.FieldType; // EnumArray<CharacterState, HitboxData>
+            var ft = fieldInfo.FieldType;
             if (!ft.IsGenericType)
                 return null;
             return ft.GetGenericArguments()[0];
+        }
+
+        private static int GetCacheCount(Type enumType)
+        {
+            Type cacheType = typeof(EnumIndexCache<>).MakeGenericType(enumType);
+            FieldInfo countFi = cacheType.GetField("Count", BindingFlags.Public | BindingFlags.Static);
+            return (int)countFi.GetValue(null);
+        }
+
+        private static string[] GetCacheNames(Type enumType)
+        {
+            Type cacheType = typeof(EnumIndexCache<>).MakeGenericType(enumType);
+            FieldInfo namesFi = cacheType.GetField("Names", BindingFlags.Public | BindingFlags.Static);
+            return (string[])namesFi.GetValue(null);
         }
     }
 }

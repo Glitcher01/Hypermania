@@ -15,26 +15,22 @@ namespace Utils.EnumArray
             get
             {
                 EnsureSize();
-                return values[ToIndex(key)];
+                return values[EnumIndexCache<TEnum>.ToIndex(key)];
             }
             set
             {
                 EnsureSize();
-                values[ToIndex(key)] = value;
+                values[EnumIndexCache<TEnum>.ToIndex(key)] = value;
             }
         }
 
         public TValue[] RawValues => values;
 
-        private static int ToIndex(TEnum e) => Convert.ToInt32(e);
-
         private void EnsureSize()
         {
-            int n = Enum.GetValues(typeof(TEnum)).Length;
+            int n = EnumIndexCache<TEnum>.Count;
             if (values == null || values.Length != n)
-            {
                 Array.Resize(ref values, n);
-            }
         }
     }
 }

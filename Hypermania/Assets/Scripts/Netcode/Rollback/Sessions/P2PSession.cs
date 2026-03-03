@@ -396,6 +396,17 @@ namespace Netcode.Rollback.Sessions
             return confirmedFrame;
         }
 
+        public TState ConfirmedState()
+        {
+            Frame confirmed = ConfirmedFrame();
+            if (confirmed == Frame.NullFrame)
+            {
+                throw new InvalidOperationException("No confirmed frame yet");
+            }
+            _syncLayer.SavedStateByFrame(confirmed).Load(out var data);
+            return data;
+        }
+
         public Frame CurrentFrame => _syncLayer.CurrentFrame;
         public uint MaxPrediction => _maxPrediction;
         public bool InLockstepMode => _maxPrediction == 0;

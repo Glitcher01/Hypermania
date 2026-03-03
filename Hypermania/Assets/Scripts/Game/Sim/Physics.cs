@@ -60,6 +60,21 @@ namespace Game.Sim
                 overlapX = ox;
                 return true;
             }
+
+            public SVector2 ClosestPointToCenter(Box other)
+            {
+                SVector2 half = Size * (sfloat)0.5f;
+
+                sfloat minX = Pos.x - half.x;
+                sfloat maxX = Pos.x + half.x;
+                sfloat minY = Pos.y - half.y;
+                sfloat maxY = Pos.y + half.y;
+
+                sfloat cx = Mathsf.Clamp(other.Pos.x, minX, maxX);
+                sfloat cy = Mathsf.Clamp(other.Pos.y, minY, maxY);
+
+                return new SVector2(cx, cy);
+            }
         }
 
         private readonly Pool<BoxEntry> _boxPool;
@@ -122,6 +137,30 @@ namespace Game.Sim
         {
             _boxPool.Clear();
             _boxInds.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Data structure to avoid many reallocs in game state simulation (are cleared every frame)
+    /// </summary>
+    public class PhysicsContext<TData>
+    {
+        public Physics<TData> Physics;
+        public List<Physics<TData>.Collision> Collisions;
+        public Dictionary<(int, int), Physics<TData>.Collision> HurtHitCollisions;
+
+        public PhysicsContext(int maxColliders)
+        {
+            Physics = new Physics<TData>(maxColliders);
+            Collisions = new List<Physics<TData>.Collision>(maxColliders);
+            HurtHitCollisions = new Dictionary<(int, int), Physics<TData>.Collision>(maxColliders);
+        }
+
+        public void Clear()
+        {
+            Physics.Clear();
+            Collisions.Clear();
+            HurtHitCollisions.Clear();
         }
     }
 }

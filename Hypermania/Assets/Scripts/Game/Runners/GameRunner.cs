@@ -1,6 +1,7 @@
+using System;
 using System.Collections.Generic;
-using Design;
 using Design.Animation;
+using Design.Configs;
 using Game.Sim;
 using Game.View;
 using Netcode.P2P;
@@ -21,6 +22,9 @@ namespace Game.Runners
         [SerializeField]
         protected bool _drawHitboxes;
 
+        [SerializeField]
+        protected ControlsConfig _controlsConfig;
+
         /// <summary>
         /// The current state of the runner. If you derive from this class, it must be initialized on Init();
         /// </summary>
@@ -40,16 +44,22 @@ namespace Game.Runners
             P2PClient client
         )
         {
-            // TODO: take in character selections from matchmaking/lobby
-            CharacterConfig sampleConfig = _config.Get(Character.SampleFighter);
-            _characters = new CharacterConfig[players.Count];
-            for (int i = 0; i < players.Count; i++)
+            if (players.Count != 2)
             {
-                _characters[i] = sampleConfig;
+                throw new InvalidOperationException("must get 2 players");
             }
-            _curState = GameState.Create(_characters);
-            _view.Init(_characters);
-            _inputBuffer = new InputBuffer();
+            // TODO: character select pass in chars here
+            // CharacterConfig sampleConfig = _config.CharacterConfig(Character.SampleFighter);
+            CharacterConfig nytheaConfig = _config.CharacterConfig(Character.Nythea);
+
+            _characters = new CharacterConfig[players.Count];
+            _characters[0] = nytheaConfig;
+            _characters[1] = nytheaConfig;
+            _curState = GameState.Create(_config, _characters);
+            _view.Init(_config, _characters);
+            if (_controlsConfig == null)
+                _controlsConfig = ScriptableObject.CreateInstance<ControlsConfig>();
+            _inputBuffer = new InputBuffer(_controlsConfig);
             _time = 0;
             _initialized = true;
         }
@@ -83,7 +93,7 @@ namespace Game.Runners
             {
                 var fighterView = _view.Fighters[i];
                 CharacterState anim = _curState.Fighters[i].State;
-                int tick = _curState.Frame - _curState.Fighters[i].StateStart;
+                int tick = _curState.SimFrame - _curState.Fighters[i].StateStart;
                 FrameData frame = _characters[i].GetFrameData(anim, tick);
 
                 Transform t = fighterView.transform;
@@ -98,12 +108,12 @@ namespace Game.Runners
                     else
                         continue;
 
-                    Vector2 centerLocal = box.CenterLocal;
+                    Vector2 centerLocal = (Vector2)box.CenterLocal;
                     if (_curState.Fighters[i].FacingDir == FighterFacing.Left)
                     {
                         centerLocal.x *= -1;
                     }
-                    Vector2 sizeLocal = box.SizeLocal;
+                    Vector2 sizeLocal = (Vector2)box.SizeLocal;
 
                     Vector3 centerWorld = t.TransformPoint(new Vector3(centerLocal.x, centerLocal.y, 0f));
                     Vector3 halfWorldX = t.TransformVector(new Vector3(sizeLocal.x * 0.5f, 0f, 0f));
