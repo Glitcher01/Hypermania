@@ -34,12 +34,14 @@ namespace Game
         ForwardAirDash = 25,
         BackAirDash = 26,
         Crouch = 27,
+        Falling = 30,
+        Landing = 31,
     }
 
     [Serializable]
     public enum Character
     {
-        SampleFighter = 0,
+        // SampleFighter = 0,
         Nythea = 1,
     }
 }

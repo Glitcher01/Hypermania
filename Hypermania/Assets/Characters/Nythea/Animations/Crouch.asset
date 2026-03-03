@@ -15,8 +15,7 @@ MonoBehaviour:
   Clip: {fileID: 7400000, guid: 072ab5e0d18244d30a271333075576a2, type: 2}
   Frames:
   - Boxes:
-    - Name: Hurt
-      CenterLocal:
+    - CenterLocal:
         x:
           rawValue: 1030691812
         y:
@@ -41,8 +40,7 @@ MonoBehaviour:
             rawValue: 0
     FrameType: 0
   - Boxes:
-    - Name: Hurt
-      CenterLocal:
+    - CenterLocal:
         x:
           rawValue: 1030691812
         y:
@@ -67,8 +65,7 @@ MonoBehaviour:
             rawValue: 0
     FrameType: 0
   - Boxes:
-    - Name: Hurt
-      CenterLocal:
+    - CenterLocal:
         x:
           rawValue: 1030691812
         y:
@@ -93,8 +90,7 @@ MonoBehaviour:
             rawValue: 0
     FrameType: 0
   - Boxes:
-    - Name: Hurt
-      CenterLocal:
+    - CenterLocal:
         x:
           rawValue: 1030691812
         y:
@@ -119,8 +115,7 @@ MonoBehaviour:
             rawValue: 0
     FrameType: 0
   - Boxes:
-    - Name: Hurt
-      CenterLocal:
+    - CenterLocal:
         x:
           rawValue: 1030691812
         y:
@@ -145,8 +140,7 @@ MonoBehaviour:
             rawValue: 0
     FrameType: 0
   - Boxes:
-    - Name: Hurt
-      CenterLocal:
+    - CenterLocal:
         x:
           rawValue: 1030691812
         y:
@@ -171,8 +165,7 @@ MonoBehaviour:
             rawValue: 0
     FrameType: 0
   - Boxes:
-    - Name: Hurt
-      CenterLocal:
+    - CenterLocal:
         x:
           rawValue: 1030691812
         y:
@@ -197,8 +190,7 @@ MonoBehaviour:
             rawValue: 0
     FrameType: 0
   - Boxes:
-    - Name: Hurt
-      CenterLocal:
+    - CenterLocal:
         x:
           rawValue: 3134889472
         y:
