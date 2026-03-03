@@ -9,6 +9,9 @@ namespace Game.View.Events
     {
         MediumPunch,
         HeavyPunch,
+        comboGood,
+        comboMiss,
+        comboOk
     }
 
     [Serializable]

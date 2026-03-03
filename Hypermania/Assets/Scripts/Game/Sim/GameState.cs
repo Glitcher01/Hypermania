@@ -53,6 +53,7 @@ namespace Game.Sim
         public sfloat HypeMeter;
         public GameMode GameMode;
         public int HitstopFramesRemaining;
+        public List<ManiaEvent> ManiaEvents; 
 
         /// <summary>
         /// Use this static builder instead of the constructor for creating new GameStates. This is because MemoryPack,
@@ -279,10 +280,9 @@ namespace Game.Sim
         {
             for (int i = 0; i < Manias.Length; i++)
             {
-                List<ManiaEvent> maniaEvents = new List<ManiaEvent>();
-                Manias[i].Tick(RealFrame, inputs[i].input, maniaEvents);
+                Manias[i].Tick(RealFrame, inputs[i].input, ManiaEvents);
 
-                foreach (ManiaEvent ev in maniaEvents)
+                foreach (ManiaEvent ev in ManiaEvents)
                 {
                     switch (ev.Kind)
                     {

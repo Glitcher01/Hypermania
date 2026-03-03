@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Game.Sim;
+using Game.View.Events;
+using Game.View.Events.Vfx;
+using Steamworks;
 using UnityEngine;
 using Utils;
 
@@ -35,11 +38,15 @@ namespace Game.View.Mania
         [SerializeField]
         public ManiaViewConfig Config;
         private Dictionary<int, GameObject> _activeNotes;
+        private Frame _rollbackStart;
+        private GameView _view;
 
         public void Init()
         {
             _activeNotes = new Dictionary<int, GameObject>();
             gameObject.SetActive(false);
+            _rollbackStart = Frame.NullFrame;
+            _view = (GameView) GameObject.Find("GameView").GetComponent("GameView");
         }
 
         public void DeInit()
@@ -54,6 +61,37 @@ namespace Game.View.Mania
         public void OnValidate()
         {
             Config.Validate();
+        }
+
+        public void RollbackRender(in GameState state) {
+            // gather all sfx from states in the current rollback process
+            if (_rollbackStart == Frame.NullFrame)
+            {
+                _rollbackStart = state.SimFrame;
+            }
+            DoViewEvents(state);
+        }
+
+        private void DoViewEvents(in GameState state)
+        {
+            // //TODO: figure out how to get reference to sfxmanager in gameview
+            // //check how to compare if current value in ManiaEvents is equal to missevent, hitevent, etc
+            // // so it would go smth like if event = miss, else if event = hit, do some sfx event
+            // for (int i = 0; i < state.ManiaEvents.Count; i++)
+            // {
+            //     ManiaEvent currentEvent = state.ManiaEvents.Get(0);
+            //     if (state.ManiaEvents[i] == ManiaEvent.MissEvent)
+            //     {
+            //         _view.SfxManager.AddDesired(
+            //             new ViewEvent<SfxEvent>
+            //             {
+            //                 Event = new SfxEvent { Kind = SfxKind.MediumPunch },
+            //                 StartFrame = state.SimFrame,
+            //                 Hash = i,
+            //             }
+            //         );
+            //     }
+            // }
         }
 
         public void Render(Frame frame, in ManiaState state)
