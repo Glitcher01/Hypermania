@@ -1,13 +1,12 @@
-using System.Collections.Generic;
 using Game.View.Fighters;
 using UnityEditor;
 using UnityEditor.EditorTools;
 using UnityEngine;
 using Utils.SoftFloat;
 
-namespace Design.Animation.MoveBuilder.Editors
+namespace Design.Animation.MoveBuilder.Editor
 {
-    [EditorTool("MoveBuilder Previow", typeof(FighterView))]
+    [EditorTool("MoveBuilder Preview", typeof(FighterView))]
     public sealed class MoveBuilderPreview : EditorTool
     {
         public override void OnToolGUI(EditorWindow window)
@@ -26,7 +25,7 @@ namespace Design.Animation.MoveBuilder.Editors
             }
             var state = animState.Value;
 
-            HandleKeybinds(fighter, m, state);
+            HandleKeybinds(m, state);
 
             FrameData curFrame = m.GetCurrentFrame(state);
             if (curFrame == null)
@@ -43,7 +42,7 @@ namespace Design.Animation.MoveBuilder.Editors
             ConsumeScenePicking();
         }
 
-        private static void HandleKeybinds(FighterView fighter, MoveBuilderModel m, MoveBuilderAnimationState state)
+        private static void HandleKeybinds(MoveBuilderModel m, MoveBuilderAnimationState state)
         {
             var e = Event.current;
             if (e == null || e.type != EventType.KeyDown)

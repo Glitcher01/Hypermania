@@ -1815,7 +1815,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _camera: {fileID: 562816628700700724}
-  layers:
+  _layers:
   - Image: {fileID: 1949342182}
     Speed: {x: 1, y: 1}
   - Image: {fileID: 841370080}

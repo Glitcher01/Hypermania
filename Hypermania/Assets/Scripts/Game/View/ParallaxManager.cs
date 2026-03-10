@@ -1,38 +1,40 @@
 using System;
 using UnityEngine;
 
-public class ParallaxController : MonoBehaviour
+namespace Game.View
 {
-    [Serializable]
-    public class ParallaxLayer
+    public class ParallaxController : MonoBehaviour
     {
-        public SpriteRenderer Image;
-        public Vector2 Speed; // 0 = no movement, 1 = moves with camera
-    }
-
-    public Camera _camera;
-    public ParallaxLayer[] layers;
-
-    private Vector3 cameraPrevPos;
-
-    void Start()
-    {
-        cameraPrevPos = _camera.transform.position;
-    }
-
-    void Update()
-    {
-        Vector3 cameraMovement = _camera.transform.position - cameraPrevPos;
-
-        for (int i = 0; i < layers.Length; i++)
+        [Serializable]
+        public class ParallaxLayer
         {
-            Vector3 pos = (Vector2)layers[i].Image.transform.position + layers[i].Speed * cameraMovement;
-            pos.z = layers[i].Image.transform.position.z;
-
-            layers[i].Image.transform.position =
-                layers[i].Image.transform.position + Vector3.Scale(cameraMovement, layers[i].Speed);
+            public SpriteRenderer Image;
+            public Vector2 Speed; // 0 = no movement, 1 = moves with camera
         }
 
-        cameraPrevPos = _camera.transform.position;
+        [SerializeField]
+        private Camera _camera;
+
+        [SerializeField]
+        private ParallaxLayer[] _layers;
+
+        private Vector3 _cameraPrevPos;
+
+        void Start()
+        {
+            _cameraPrevPos = _camera.transform.position;
+        }
+
+        void Update()
+        {
+            Vector3 cameraMovement = _camera.transform.position - _cameraPrevPos;
+
+            for (int i = 0; i < _layers.Length; i++)
+            {
+                _layers[i].Image.transform.position += Vector3.Scale(cameraMovement, _layers[i].Speed);
+            }
+
+            _cameraPrevPos = _camera.transform.position;
+        }
     }
 }

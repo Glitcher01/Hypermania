@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Design.Animation;
 using Design.Configs;
@@ -436,12 +435,7 @@ namespace Game.Sim
                 }
             }
 
-            if (
-                dashCancelEligible
-                && InputH.IsHeld(ForwardInput)
-                && dashCancelEligible
-                && State == CharacterState.ForwardDash
-            )
+            if (dashCancelEligible && InputH.IsHeld(ForwardInput) && State == CharacterState.ForwardDash)
             {
                 SetState(CharacterState.Running, frame, Frame.Infinity);
             }

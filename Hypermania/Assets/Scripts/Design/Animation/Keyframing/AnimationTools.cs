@@ -256,8 +256,8 @@ namespace Design.Animation.Keyframing
                 float* ptr2 = (float*)ptr;
                 return *ptr2;
             }
-            int hash = Bit30Hash_GetStringHash(resolver.GetCategory() + "_" + resolver.GetLabel());
-            int Bit30Hash_GetStringHash(string value)
+            int hash = Bit30HashGetStringHash(resolver.GetCategory() + "_" + resolver.GetLabel());
+            int Bit30HashGetStringHash(string value)
             {
                 return PreserveFirst30Bits(Animator.StringToHash(value));
             }
@@ -266,25 +266,6 @@ namespace Design.Animation.Keyframing
                 return input & 0x3FFFFFFF;
             }
             return ConvertDiscreteIntToFloat(hash);
-        }
-
-        private static Transform FindChildByName(Transform root, string name)
-        {
-            if (root == null || string.IsNullOrEmpty(name))
-                return null;
-
-            var q = new Queue<Transform>();
-            q.Enqueue(root);
-            while (q.Count > 0)
-            {
-                var t = q.Dequeue();
-                if (t != root && t.name == name)
-                    return t;
-
-                for (int i = 0; i < t.childCount; i++)
-                    q.Enqueue(t.GetChild(i));
-            }
-            return null;
         }
 
         private static void AddTransformKeysAtTime(

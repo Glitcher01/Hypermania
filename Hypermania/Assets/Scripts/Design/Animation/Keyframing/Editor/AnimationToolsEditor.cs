@@ -1,10 +1,10 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace Design.Animation.Keyframing
+namespace Design.Animation.Keyframing.Editor
 {
     [CustomEditor(typeof(AnimationTools))]
-    public sealed class AnimationKeyframeToolsEditor : Editor
+    public sealed class AnimationKeyframeToolsEditor : UnityEditor.Editor
     {
         public override void OnInspectorGUI()
         {

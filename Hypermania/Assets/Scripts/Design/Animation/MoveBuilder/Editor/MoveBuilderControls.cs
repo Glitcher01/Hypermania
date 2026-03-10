@@ -1,13 +1,12 @@
-using Game;
 using Game.View.Fighters;
 using UnityEditor;
 using UnityEngine;
 using Utils.SoftFloat;
 
-namespace Design.Animation.MoveBuilder.Editors
+namespace Design.Animation.MoveBuilder.Editor
 {
     [CustomEditor(typeof(FighterView), true)]
-    public sealed class MoveBuilderControls : Editor
+    public sealed class MoveBuilderControls : UnityEditor.Editor
     {
         public override void OnInspectorGUI()
         {
@@ -56,7 +55,7 @@ namespace Design.Animation.MoveBuilder.Editors
             if (m.HasUnsavedChanges(state))
                 EditorGUILayout.HelpBox("You have unsaved changes.", MessageType.Warning);
 
-            using (new EditorGUI.DisabledScope(m == null || !m.HasUnsavedChanges(state)))
+            using (new EditorGUI.DisabledScope(!m.HasUnsavedChanges(state)))
             {
                 if (GUILayout.Button(m.HasUnsavedChanges(state) ? "Apply*" : "Apply"))
                 {
