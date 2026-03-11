@@ -12,37 +12,70 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25c40c74260407c44937a7a045857c43, type: 3}
   m_Name: ControlsConfig
   m_EditorClassIdentifier: 
-  controlScheme:
+  _controlScheme:
     values:
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
-    - primaryKey: 0
-      altKey: 0
+    - _primaryKey: 0
+      _altKey: 0
+      _primaryGamepadButton: 13
+      _altGamepadButton: 13
+    - _primaryKey: 37
+      _altKey: 0
+      _primaryGamepadButton: 0
+      _altGamepadButton: 13
+    - _primaryKey: 33
+      _altKey: 0
+      _primaryGamepadButton: 1
+      _altGamepadButton: 13
+    - _primaryKey: 15
+      _altKey: 0
+      _primaryGamepadButton: 2
+      _altGamepadButton: 13
+    - _primaryKey: 18
+      _altKey: 0
+      _primaryGamepadButton: 3
+      _altGamepadButton: 13
+    - _primaryKey: 24
+      _altKey: 0
+      _primaryGamepadButton: 7
+      _altGamepadButton: 13
+    - _primaryKey: 25
+      _altKey: 0
+      _primaryGamepadButton: 4
+      _altGamepadButton: 13
+    - _primaryKey: 26
+      _altKey: 0
+      _primaryGamepadButton: 5
+      _altGamepadButton: 13
+    - _primaryKey: 23
+      _altKey: 0
+      _primaryGamepadButton: 6
+      _altGamepadButton: 13
+    - _primaryKey: 29
+      _altKey: 0
+      _primaryGamepadButton: 11
+      _altGamepadButton: 13
+    - _primaryKey: 15
+      _altKey: 0
+      _primaryGamepadButton: 3
+      _altGamepadButton: 13
+    - _primaryKey: 37
+      _altKey: 0
+      _primaryGamepadButton: 1
+      _altGamepadButton: 13
+    - _primaryKey: 33
+      _altKey: 0
+      _primaryGamepadButton: 7
+      _altGamepadButton: 13
+    - _primaryKey: 18
+      _altKey: 0
+      _primaryGamepadButton: 4
+      _altGamepadButton: 13
+    - _primaryKey: 0
+      _altKey: 0
+      _primaryGamepadButton: 2
+      _altGamepadButton: 13
+    - _primaryKey: 0
+      _altKey: 0
+      _primaryGamepadButton: 5
+      _altGamepadButton: 13
+  _isControllerInput: 1

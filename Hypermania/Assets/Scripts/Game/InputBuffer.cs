@@ -2,6 +2,7 @@ using System;
 using Design.Configs;
 using Game.Sim;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using Utils.EnumArray;
 
 namespace Game
@@ -9,6 +10,8 @@ namespace Game
     public class InputBuffer
     {
         private EnumArray<InputFlags, Binding> _controlScheme;
+        private EnumArray<InputFlags, Binding> _p2controlScheme;
+        private Boolean _isControllerInput;
 
         /**
          * Base InputBuffer Constructor
@@ -21,6 +24,8 @@ namespace Game
         public InputBuffer(ControlsConfig config)
         {
             _controlScheme = config.GetControlScheme();
+            _isControllerInput = config.IsControllerInput();
+
         }
 
         private InputFlags _input = InputFlags.None;
@@ -38,21 +43,39 @@ namespace Game
                 {
                     continue; // Skips the None InputFlag (Does Not Have a Key Press)
                 }
-
-                // Checks if either the primary or alt button set in config is pressed
-                // Ignores keys set to none
-                if (
-                    (
-                        _controlScheme[flag].GetPrimaryKey() != Key.None
-                        && Keyboard.current[_controlScheme[flag].GetPrimaryKey()].isPressed
-                    )
-                    || (
-                        _controlScheme[flag].GetAltKey() != Key.None
-                        && Keyboard.current[_controlScheme[flag].GetAltKey()].isPressed
-                    )
-                )
+                if (_isControllerInput)
                 {
-                    _input |= flag;
+                    if (
+                        (
+                            _controlScheme[flag].GetPrimaryGamepadButton() != GamepadButtons.None
+                            && Gamepad.current[(GamepadButton)(_controlScheme[flag].GetPrimaryGamepadButton())].isPressed
+                        )
+                        || (
+                            _controlScheme[flag].GetAltGamepadButton() != GamepadButtons.None
+                            && Gamepad.current[(GamepadButton)(_controlScheme[flag].GetAltGamepadButton())].isPressed
+                        )
+                    )
+                    {
+                        _input |= flag;
+                    }
+                }
+                else
+                {
+                    // Checks if either the primary or alt button set in config is pressed
+                    // Ignores keys set to none
+                    if (
+                        (
+                            _controlScheme[flag].GetPrimaryKey() != Key.None
+                            && Keyboard.current[_controlScheme[flag].GetPrimaryKey()].isPressed
+                        )
+                        || (
+                            _controlScheme[flag].GetAltKey() != Key.None
+                            && Keyboard.current[_controlScheme[flag].GetAltKey()].isPressed
+                        )
+                    )
+                    {
+                        _input |= flag;
+                    }
                 }
             }
 
