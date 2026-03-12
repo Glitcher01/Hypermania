@@ -11,22 +11,21 @@ namespace Game
     public class InputBuffer
     {
         private EnumArray<InputFlags, Binding> _controlScheme;
-        [SerializeField]
         private InputDevice _inputDevice;
+
         /**
          * Base InputBuffer Constructor
          *
          * Constructs an InputBuffer to accept user input
          *
          * @param config - The Scriptable ControlsConfig Object to Reference
+         * @param inputDevice - The InputDevice to read inputs from
          *
          */
-        public InputBuffer(ControlsConfig config, InputDevice inputDevice)
+        public InputBuffer(InputDevice inputDevice, EnumArray<InputFlags, Binding> controlScheme)
         {
-            _controlScheme = config.GetControlSchemeP1();
-
+            _controlScheme = controlScheme;
             _inputDevice = inputDevice;
-
         }
 
         private InputFlags _input = InputFlags.None;
@@ -38,7 +37,8 @@ namespace Game
 
         public void Saturate()
         {
-            if (_inputDevice == null) return;
+            if (_inputDevice == null)
+                return;
 
             foreach (InputFlags flag in Enum.GetValues(typeof(InputFlags)))
             {
@@ -61,7 +61,6 @@ namespace Game
                     {
                         _input |= flag;
                     }
-
                 }
                 else
                 {
@@ -70,11 +69,15 @@ namespace Game
                     if (
                         (
                             _controlScheme[flag].GetPrimaryGamepadButton() != GamepadButtons.None
-                            && ((Gamepad)_inputDevice)[(GamepadButton)_controlScheme[flag].GetPrimaryGamepadButton()].isPressed
+                            && ((Gamepad)_inputDevice)[
+                                (GamepadButton)_controlScheme[flag].GetPrimaryGamepadButton()
+                            ].isPressed
                         )
                         || (
                             _controlScheme[flag].GetAltGamepadButton() != GamepadButtons.None
-                            && ((Gamepad)_inputDevice)[(GamepadButton)_controlScheme[flag].GetAltGamepadButton()].isPressed
+                            && ((Gamepad)_inputDevice)[
+                                (GamepadButton)_controlScheme[flag].GetAltGamepadButton()
+                            ].isPressed
                         )
                     )
                     {

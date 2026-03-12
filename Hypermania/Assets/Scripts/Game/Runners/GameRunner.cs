@@ -52,8 +52,14 @@ namespace Game.Runners
             _view.Init(_options);
             if (_controlsConfig == null)
                 _controlsConfig = ScriptableObject.CreateInstance<ControlsConfig>();
-            _inputBufferP1 = new InputBuffer(_controlsConfig, GameObject.Find("GameManager").GetComponent<JoinOnInput>().GetPlayerInputDevice(1));
-            _inputBufferP2 = new InputBuffer(_controlsConfig, GameObject.Find("GameManager").GetComponent<JoinOnInput>().GetPlayerInputDevice(2));
+            _inputBufferP1 = new InputBuffer(
+                GameObject.Find("GameManager").GetComponent<JoinOnInput>().GetPlayerInputDevice(1),
+                _controlsConfig.GetControlScheme(1)
+            );
+            _inputBufferP2 = new InputBuffer(
+                GameObject.Find("GameManager").GetComponent<JoinOnInput>().GetPlayerInputDevice(2),
+                _controlsConfig.GetControlScheme(2)
+            );
             _time = 0;
             _initialized = true;
         }

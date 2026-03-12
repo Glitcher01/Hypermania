@@ -12,12 +12,6 @@ namespace Design.Configs
     public class ControlsConfig : ScriptableObject
     {
         [SerializeField]
-        private GameObject _playerInputPrefab;
-        
-        private InputDevice _P1_input;
-        private InputDevice _P2_input;
-
-        [SerializeField]
         private EnumArray<InputFlags, Binding> _controlSchemeP1;
 
         [SerializeField]
@@ -27,7 +21,7 @@ namespace Design.Configs
         private readonly Dictionary<InputFlags, Binding> _defaultBindings = new()
         {
             { InputFlags.None, new Binding(Key.None, Key.None, GamepadButtons.None, GamepadButtons.None) },
-            { InputFlags.Up, new Binding(Key.W, Key.None, GamepadButtons.DpadUp, GamepadButtons.None) },
+            { InputFlags.Up, new Binding(Key.W, Key.Space, GamepadButtons.DpadUp, GamepadButtons.None) },
             { InputFlags.Down, new Binding(Key.S, Key.None, GamepadButtons.DpadDown, GamepadButtons.None) },
             { InputFlags.Left, new Binding(Key.A, Key.None, GamepadButtons.DpadLeft, GamepadButtons.None) },
             { InputFlags.Right, new Binding(Key.D, Key.None, GamepadButtons.DpadRight, GamepadButtons.None) },
@@ -53,9 +47,6 @@ namespace Design.Configs
         // Sets Default Bindings onEnable to avoid Null Primary bindings
         private void OnEnable()
         {
-            _P1_input = null;
-            _P2_input = null;
-
             _controlSchemeP1 ??= new EnumArray<InputFlags, Binding>();
             _controlSchemeP2 ??= new EnumArray<InputFlags, Binding>();
 
@@ -70,20 +61,22 @@ namespace Design.Configs
                     _controlSchemeP2[flag] = _defaultBindings[flag];
                 }
             }
-
-            
         }
 
         /**
-         * Getter to return array of InputFlags and Bindings
+         * Getter to return array of InputFlags and Bindings for Specific Player
          */
-        public EnumArray<InputFlags, Binding> GetControlSchemeP1()
+        public EnumArray<InputFlags, Binding> GetControlScheme(int index)
         {
-            return _controlSchemeP1;
-        }
-        public EnumArray<InputFlags, Binding> GetControlSchemeP2()
-        {
-            return _controlSchemeP2;
+            if (index == 1)
+            {
+                return _controlSchemeP1;
+            }
+            if (index == 2)
+            {
+                return _controlSchemeP2;
+            }
+            return null;
         }
     }
 
