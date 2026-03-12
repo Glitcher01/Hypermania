@@ -41,7 +41,6 @@ namespace Design.Configs
         public ControlsConfig()
         {
             OnEnable();
-
         }
 
         // Sets Default Bindings onEnable to avoid Null Primary bindings
