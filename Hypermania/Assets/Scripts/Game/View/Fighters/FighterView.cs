@@ -52,7 +52,7 @@ namespace Game.View.Fighters
             CharacterState animState = state.State;
             int totalTicks = _characterConfig.GetHitboxData(animState).TotalTicks;
 
-            int ticks = state.CurrentTick;
+            int ticks = frame - state.StateStart;
             if (_characterConfig.AnimLoops(animState))
             {
                 ticks %= totalTicks;
@@ -93,7 +93,11 @@ namespace Game.View.Fighters
                 );
             }
             if (
-                (state.State == CharacterState.Hit || state.State == CharacterState.Knockdown)
+                (
+                    state.State == CharacterState.Hit
+                    || state.State == CharacterState.Knockdown
+                    || state.State == CharacterState.Death
+                )
                 && simFrame == state.StateStart
             )
             {

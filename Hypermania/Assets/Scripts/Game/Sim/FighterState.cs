@@ -3,9 +3,6 @@ using Design.Animation;
 using Design.Configs;
 using Game.View.Overlay;
 using MemoryPack;
-using Steamworks;
-using UnityEngine;
-using UnityEngine.Assertions.Must;
 using Utils;
 using Utils.SoftFloat;
 
@@ -43,8 +40,6 @@ namespace Game.Sim
         public int AirDashCount;
         public VictoryKind[] Victories;
         public int NumVictories;
-        public sfloat SpeedRate;
-        public int CurrentTick;
 
         public int Index { get; private set; }
         public CharacterState State { get; private set; }
@@ -54,7 +49,7 @@ namespace Game.Sim
         /// Set to a value that marks the first frame in which the character should return to neutral.
         /// </summary>
         public Frame StateEnd { get; private set; }
-        public Frame ImmunityEnd { get; set; }
+        public Frame ImmunityEnd { get; private set; }
 
         public FighterFacing FacingDir;
 
@@ -124,7 +119,6 @@ namespace Game.Sim
                 AirDashCount = 0,
                 Victories = new VictoryKind[lives],
                 NumVictories = 0,
-                SpeedRate = (sfloat)1,
             };
             return state;
         }
@@ -144,7 +138,6 @@ namespace Game.Sim
             AirDashCount = 0;
             Health = config.Health;
             FacingDir = facingDirection;
-            SpeedRate = (sfloat)1;
         }
 
         public void DoFrameStart(GameOptions options)
@@ -190,30 +183,7 @@ namespace Game.Sim
             {
                 State = nextState;
                 StateStart = start;
-                if (end != Frame.Infinity)
-                {
-                    int duration = (int)((sfloat)(end.No - start.No) / SpeedRate);
-                    StateEnd = start + duration;
-                }
-                else
-                {
-                    StateEnd = Frame.Infinity;
-                }
-            }
-        }
-
-        // To be ran during a round end / during a round.
-        public void setSpeedRate(Frame frame, sfloat value)
-        {
-            SpeedRate = value;
-            if (StateEnd != Frame.Infinity)
-            {
-                // If the animation isn't done yet, update it!
-                if (StateEnd - frame > 0)
-                {
-                    StateEnd = frame + (int)((sfloat)(StateEnd - frame) / SpeedRate);
-                }
-                StateStart = frame - (int)((sfloat)(frame - StateStart) / SpeedRate);
+                StateEnd = end;
             }
         }
 
@@ -420,8 +390,8 @@ namespace Game.Sim
                 }
                 return;
             }
-            CurrentTick = (int)((frame - StateStart) * SpeedRate);
-            FrameData frameData = config.GetFrameData(State, CurrentTick);
+
+            FrameData frameData = config.GetFrameData(State, frame - StateStart);
             bool isOnBeat = options.Global.Audio.BeatWithinWindow(
                 realFrame,
                 AudioConfig.BeatSubdivision.QuarterNote,
@@ -480,11 +450,11 @@ namespace Game.Sim
                 && Position.y > options.Global.GroundY
             )
             {
-                Velocity.y += options.Global.Gravity * SpeedRate / GameManager.TPS;
+                Velocity.y += options.Global.Gravity * 1 / GameManager.TPS;
             }
 
             // Update Position
-            Position += Velocity * SpeedRate / GameManager.TPS;
+            Position += Velocity * 1 / GameManager.TPS;
 
             // Floor collision
             if (Position.y <= options.Global.GroundY)
@@ -550,8 +520,8 @@ namespace Game.Sim
 
         public void AddBoxes(Frame frame, CharacterConfig config, Physics<BoxProps> physics, int handle)
         {
-            CurrentTick = (int)((frame - StateStart) * SpeedRate);
-            FrameData frameData = config.GetFrameData(State, CurrentTick);
+            int tick = frame - StateStart;
+            FrameData frameData = config.GetFrameData(State, tick);
 
             foreach (var box in frameData.Boxes)
             {

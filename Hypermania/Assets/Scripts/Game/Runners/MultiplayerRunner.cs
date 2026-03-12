@@ -31,6 +31,7 @@ namespace Game.Runners
                 SteamNetworkingIdentity
             >()
                 .WithNumPlayers(players.Count)
+                .WithMaxPredictionWindow(GameManager.ROLLBACK_FRAMES)
                 .WithFps(GameManager.TPS);
             foreach ((PlayerHandle playerHandle, PlayerKind playerKind, SteamNetworkingIdentity address) in players)
             {
@@ -141,7 +142,7 @@ namespace Game.Runners
                 }
             }
 
-            if (_session.ConfirmedFrame() != Frame.NullFrame && _session.ConfirmedState().FightersDead())
+            if (_session.ConfirmedFrame() != Frame.NullFrame && _session.ConfirmedState().GameMode == GameMode.End)
             {
                 DeInit();
                 return;

@@ -79,7 +79,7 @@ namespace Game.Runners
                 var fighterView = _view.Fighters[i];
                 CharacterState anim = _curState.Fighters[i].State;
                 int tick = _curState.SimFrame - _curState.Fighters[i].StateStart;
-                FrameData frame = _options.Players[i].Character.GetFrameData(anim, _curState.Fighters[i].CurrentTick);
+                FrameData frame = _options.Players[i].Character.GetFrameData(anim, tick);
 
                 Transform t = fighterView.transform;
 

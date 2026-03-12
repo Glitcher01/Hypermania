@@ -18,6 +18,7 @@ namespace Game.Sim
         Mania,
         RoundEnd, // Used to be roundStart, indicates the end of a round
         Countdown, // Countdown to round.
+        End, // after game is done
     }
 
     [Serializable]
@@ -56,6 +57,7 @@ namespace Game.Sim
         [MemoryPackIgnore]
         public const int MAX_COLLIDERS = 100;
 
+        public int PartialSimFrameCount; // to accumulate frames when speedRatio is < 1
         public Frame RealFrame; // network/music frame
         public Frame SimFrame; // Game sim frame
         public Frame RoundStart; // Added to indicate when a round starts.
@@ -65,7 +67,9 @@ namespace Game.Sim
         public sfloat HypeMeter;
         public GameMode GameMode;
         public int HitstopFramesRemaining;
-        public Frame lifeLost;
+
+        public sfloat SpeedRatio;
+        public Frame RoundEndStart;
 
         /// <summary>
         /// Use this static builder instead of the constructor for creating new GameStates. This is because MemoryPack,
@@ -87,6 +91,7 @@ namespace Game.Sim
                 HitstopFramesRemaining = 0,
                 HypeMeter = (sfloat)0f,
                 GameMode = GameMode.Countdown,
+                SpeedRatio = 1,
             };
             for (int i = 0; i < options.Players.Length; i++)
             {
@@ -107,6 +112,11 @@ namespace Game.Sim
 
         private void DoRoundEnd(GameOptions options, Span<GameInput> outInputs)
         {
+            SpeedRatio = 1 - (sfloat)(RealFrame - RoundEndStart) / (options.Global.RoundEndTicks) * (sfloat)0.9f;
+            if (RealFrame - RoundEndStart < options.Global.RoundEndTicks)
+            {
+                return;
+            }
             for (int i = 0; i < Fighters.Length; i++)
             {
                 Fighters[i].Health = options.Players[i].Character.Health;
@@ -116,6 +126,8 @@ namespace Game.Sim
                 outInputs[i] = GameInput.None;
                 Manias[i].ManiaEvents.Clear();
             }
+
+            RoundEndStart = Frame.NullFrame;
             HypeMeter = (sfloat)0.0f;
             RoundStart = SimFrame;
             GameMode = GameMode.Countdown;
@@ -123,14 +135,16 @@ namespace Game.Sim
 
         private void DoCountdown(GameOptions options, Span<GameInput> outInputs)
         {
+            SpeedRatio = 1;
+            for (int i = 0; i < Fighters.Length; i++)
+            {
+                outInputs[i] = GameInput.None;
+                Fighters[i].SetState(CharacterState.Idle, SimFrame, Frame.Infinity);
+            }
             if (SimFrame - RoundStart >= options.Global.RoundCountdownTicks) // Added an attribute to config for countdown.
             {
                 GameMode = GameMode.Fighting;
                 RoundEnd = SimFrame + options.Global.RoundTimeTicks;
-            }
-            for (int i = 0; i < Fighters.Length; i++)
-            {
-                outInputs[i] = GameInput.None;
             }
         }
 
@@ -146,20 +160,21 @@ namespace Game.Sim
                 Manias[i].ManiaEvents.Clear();
             }
 
+            if (GameMode == GameMode.End)
+            {
+                return;
+            }
+
+            PartialSimFrameCount++;
+            if (PartialSimFrameCount < 1 / SpeedRatio)
+            {
+                return;
+            }
+            PartialSimFrameCount = 0;
             Span<GameInput> remapInputs = stackalloc GameInput[Fighters.Length];
             if (GameMode == GameMode.RoundEnd)
             {
-                if (lifeLost != null && RealFrame - lifeLost > 64)
-                {
-                    DoRoundEnd(options, remapInputs);
-                }
-                else
-                {
-                    for (int i = 0; i < Fighters.Length; i++)
-                    {
-                        remapInputs[i] = inputs[i].input;
-                    }
-                }
+                DoRoundEnd(options, remapInputs);
             }
             else if (GameMode == GameMode.Countdown)
             {
@@ -238,6 +253,7 @@ namespace Game.Sim
                         Fighters[i].Lives--;
                         if (Fighters[i].Lives <= 0)
                         {
+                            GameMode = GameMode.End;
                             return;
                         }
 
@@ -252,11 +268,9 @@ namespace Game.Sim
                         }
 
                         Fighters[1 - i].NumVictories++;
+                        Fighters[i].SetState(CharacterState.Death, SimFrame, Frame.Infinity);
                         GameMode = GameMode.RoundEnd;
-                        lifeLost = RealFrame;
-                        Debug.Log("Life was lost, recorded here");
-                        Fighters[i].setSpeedRate(RealFrame, (sfloat)0.1);
-                        Fighters[1 - i].setSpeedRate(RealFrame, (sfloat)0.1);
+                        RoundEndStart = RealFrame;
                         // Ensure that if the player died to a mania attack it ends immediately
                         for (int j = 0; j < Manias.Length; j++)
                         {
