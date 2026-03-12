@@ -6,18 +6,12 @@ using Netcode.P2P;
 using Netcode.Rollback;
 using Netcode.Rollback.Sessions;
 using Steamworks;
-using UnityEngine;
-using Utils;
 
 namespace Game.Runners
 {
-    public class MultiplayerRunner : GameRunner
+    public class LocalRunner : GameRunner
     {
-        private P2PSession<GameState, GameInput, SteamNetworkingIdentity> _session;
-
-        private uint _waitRemaining;
-        private PlayerHandle _myHandle;
-        private PlayerHandle _remoteHandle;
+        protected SyncTestSession<GameState, GameInput> _session;
 
         public override void Init(
             List<(PlayerHandle playerHandle, PlayerKind playerKind, SteamNetworkingIdentity address)> players,
@@ -35,34 +29,21 @@ namespace Game.Runners
                 .WithFps(GameManager.TPS);
             foreach ((PlayerHandle playerHandle, PlayerKind playerKind, SteamNetworkingIdentity address) in players)
             {
-                if (playerKind == PlayerKind.Local)
+                if (playerKind != PlayerKind.Local)
                 {
-                    _myHandle = playerHandle;
-                }
-                else if (playerKind == PlayerKind.Remote)
-                {
-                    // assume only two people for now
-                    _remoteHandle = playerHandle;
+                    throw new InvalidOperationException("Cannot have remote/spectators in a local session");
                 }
                 builder.AddPlayer(
                     new PlayerType<SteamNetworkingIdentity> { Kind = playerKind, Address = address },
                     playerHandle
                 );
             }
-            _session = builder.StartP2PSession<GameState>(client);
-            _waitRemaining = 0;
-
-            if (_myHandle.Id == -1 || _remoteHandle.Id == -1)
-            {
-                throw new InvalidOperationException("Players not found in multiplayer runner");
-            }
+            _session = builder.StartSynctestSession<GameState>();
         }
 
         public override void DeInit()
         {
-            _waitRemaining = 0;
             _session = null;
-            _myHandle = new PlayerHandle(-1);
             base.DeInit();
         }
 
@@ -73,31 +54,15 @@ namespace Game.Runners
                 return;
             }
 
-            _inputBufferP1.Clear();
-            _inputBufferP1.Saturate();
-
-            _session.PollRemoteClients();
-
-            foreach (RollbackEvent<GameInput, SteamNetworkingIdentity> ev in _session.DrainEvents())
+            for (int i = 0; i < _inputBuffers.Length; i++)
             {
-                Debug.Log($"[Game] Received {ev.Kind} event");
-                switch (ev.Kind)
-                {
-                    case RollbackEventKind.WaitRecommendation:
-                        var waitRec = ev.GetWaitRecommendation();
-                        _waitRemaining = waitRec.SkipFrames;
-                        break;
-                }
+                _inputBuffers[i].Clear();
+                _inputBuffers[i].Saturate();
             }
 
-            // accumulate time and update frame
             float fpsDelta = 1.0f / GameManager.TPS;
-            if (_session.FramesAhead > 0)
-            {
-                fpsDelta *= 1.1f;
-            }
-
             _time += deltaTime;
+
             while (_time > fpsDelta)
             {
                 _time -= fpsDelta;
@@ -105,21 +70,18 @@ namespace Game.Runners
             }
         }
 
-        void GameLoop()
+        protected void GameLoop()
         {
-            if (_session.CurrentState != SessionState.Running)
+            if (_session == null)
             {
                 return;
             }
 
-            if (_waitRemaining > 0)
+            for (int i = 0; i < 2; i++)
             {
-                Debug.Log("[Game] Skipping frame due to wait recommendation");
-                _waitRemaining--;
-                return;
+                GameInput input = i < _inputBuffers.Length ? _inputBuffers[i].Poll() : GameInput.None;
+                _session.AddLocalInput(new PlayerHandle(i), input);
             }
-
-            _session.AddLocalInput(_myHandle, _inputBufferP1.Poll());
 
             List<RollbackRequest<GameState, GameInput>> requests = _session.AdvanceFrame();
             foreach (RollbackRequest<GameState, GameInput> request in requests)
@@ -142,16 +104,12 @@ namespace Game.Runners
                 }
             }
 
-            if (_session.ConfirmedFrame() != Frame.NullFrame && _session.ConfirmedState().GameMode == GameMode.End)
+            if (_curState.GameMode == GameMode.End)
             {
                 DeInit();
                 return;
             }
-            InfoOverlayDetails details = new InfoOverlayDetails
-            {
-                HasPing = true,
-                Ping = _session.NetworkStats(_remoteHandle).Ping,
-            };
+            InfoOverlayDetails details = new InfoOverlayDetails { HasPing = false, Ping = 0 };
             _view.Render(_curState, _options, details);
         }
     }

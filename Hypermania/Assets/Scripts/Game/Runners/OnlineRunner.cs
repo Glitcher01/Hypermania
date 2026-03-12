@@ -6,12 +6,18 @@ using Netcode.P2P;
 using Netcode.Rollback;
 using Netcode.Rollback.Sessions;
 using Steamworks;
+using UnityEngine;
+using Utils;
 
 namespace Game.Runners
 {
-    public class SingleplayerRunner : GameRunner
+    public class OnlineRunner : GameRunner
     {
-        protected SyncTestSession<GameState, GameInput> _session;
+        private P2PSession<GameState, GameInput, SteamNetworkingIdentity> _session;
+
+        private uint _waitRemaining;
+        private PlayerHandle _myHandle;
+        private PlayerHandle _remoteHandle;
 
         public override void Init(
             List<(PlayerHandle playerHandle, PlayerKind playerKind, SteamNetworkingIdentity address)> players,
@@ -19,6 +25,7 @@ namespace Game.Runners
         )
         {
             base.Init(players, client);
+
             SessionBuilder<GameInput, SteamNetworkingIdentity> builder = new SessionBuilder<
                 GameInput,
                 SteamNetworkingIdentity
@@ -28,21 +35,39 @@ namespace Game.Runners
                 .WithFps(GameManager.TPS);
             foreach ((PlayerHandle playerHandle, PlayerKind playerKind, SteamNetworkingIdentity address) in players)
             {
-                if (playerKind != PlayerKind.Local)
+                if (playerKind == PlayerKind.Local)
                 {
-                    throw new InvalidOperationException("Cannot have remote/spectators in a local session");
+                    _myHandle = playerHandle;
+                }
+                else if (playerKind == PlayerKind.Remote)
+                {
+                    // assume only two people for now
+                    _remoteHandle = playerHandle;
                 }
                 builder.AddPlayer(
                     new PlayerType<SteamNetworkingIdentity> { Kind = playerKind, Address = address },
                     playerHandle
                 );
             }
-            _session = builder.StartSynctestSession<GameState>();
+            _session = builder.StartP2PSession<GameState>(client);
+            _waitRemaining = 0;
+
+            if (_myHandle.Id == -1 || _remoteHandle.Id == -1)
+            {
+                throw new InvalidOperationException("Players not found in multiplayer runner");
+            }
+
+            if (_options.LocalPlayers.Length != 1)
+            {
+                throw new InvalidOperationException("Multiplayer runner only supports one local player");
+            }
         }
 
         public override void DeInit()
         {
+            _waitRemaining = 0;
             _session = null;
+            _myHandle = new PlayerHandle(-1);
             base.DeInit();
         }
 
@@ -53,15 +78,31 @@ namespace Game.Runners
                 return;
             }
 
-            _inputBufferP1.Clear();
-            _inputBufferP1.Saturate();
+            _inputBuffers[0].Clear();
+            _inputBuffers[0].Saturate();
 
-            _inputBufferP2.Clear();
-            _inputBufferP2.Saturate();
+            _session.PollRemoteClients();
 
+            foreach (RollbackEvent<GameInput, SteamNetworkingIdentity> ev in _session.DrainEvents())
+            {
+                Debug.Log($"[Game] Received {ev.Kind} event");
+                switch (ev.Kind)
+                {
+                    case RollbackEventKind.WaitRecommendation:
+                        var waitRec = ev.GetWaitRecommendation();
+                        _waitRemaining = waitRec.SkipFrames;
+                        break;
+                }
+            }
+
+            // accumulate time and update frame
             float fpsDelta = 1.0f / GameManager.TPS;
-            _time += deltaTime;
+            if (_session.FramesAhead > 0)
+            {
+                fpsDelta *= 1.1f;
+            }
 
+            _time += deltaTime;
             while (_time > fpsDelta)
             {
                 _time -= fpsDelta;
@@ -69,15 +110,21 @@ namespace Game.Runners
             }
         }
 
-        protected void GameLoop()
+        void GameLoop()
         {
-            if (_session == null)
+            if (_session.CurrentState != SessionState.Running)
             {
                 return;
             }
 
-            _session.AddLocalInput(new PlayerHandle(0), _inputBufferP1.Poll());
-            _session.AddLocalInput(new PlayerHandle(1), _inputBufferP2.Poll());
+            if (_waitRemaining > 0)
+            {
+                Debug.Log("[Game] Skipping frame due to wait recommendation");
+                _waitRemaining--;
+                return;
+            }
+
+            _session.AddLocalInput(_myHandle, _inputBuffers[0].Poll());
 
             List<RollbackRequest<GameState, GameInput>> requests = _session.AdvanceFrame();
             foreach (RollbackRequest<GameState, GameInput> request in requests)
@@ -100,12 +147,16 @@ namespace Game.Runners
                 }
             }
 
-            if (_curState.GameMode == GameMode.End)
+            if (_session.ConfirmedFrame() != Frame.NullFrame && _session.ConfirmedState().GameMode == GameMode.End)
             {
                 DeInit();
                 return;
             }
-            InfoOverlayDetails details = new InfoOverlayDetails { HasPing = false, Ping = 0 };
+            InfoOverlayDetails details = new InfoOverlayDetails
+            {
+                HasPing = true,
+                Ping = _session.NetworkStats(_remoteHandle).Ping,
+            };
             _view.Render(_curState, _options, details);
         }
     }

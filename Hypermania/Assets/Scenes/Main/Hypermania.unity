@@ -358,8 +358,9 @@ MonoBehaviour:
     - HealOnActionable: 1
       Character: {fileID: 11400000, guid: b193994fbc9b652d2985b409cb9f63cf, type: 2}
       SkinIndex: 1
+    LocalPlayers:
+    - Controls: {fileID: 0}
   _drawHitboxes: 1
-  _controlsConfig: {fileID: 0}
   _advanceKey: 62
   _holdS: 0.3
 --- !u!1001 &228016475
@@ -585,8 +586,9 @@ MonoBehaviour:
     - HealOnActionable: 0
       Character: {fileID: 11400000, guid: b193994fbc9b652d2985b409cb9f63cf, type: 2}
       SkinIndex: 1
+    LocalPlayers:
+    - Controls: {fileID: 0}
   _drawHitboxes: 1
-  _controlsConfig: {fileID: 11400000, guid: 1de48faf385075048a7466fb728eef54, type: 2}
 --- !u!4 &286925406
 Transform:
   m_ObjectHideFlags: 0
@@ -981,8 +983,9 @@ MonoBehaviour:
     - HealOnActionable: 0
       Character: {fileID: 11400000, guid: b193994fbc9b652d2985b409cb9f63cf, type: 2}
       SkinIndex: 1
+    LocalPlayers:
+    - Controls: {fileID: 0}
   _drawHitboxes: 1
-  _controlsConfig: {fileID: 11400000, guid: 1de48faf385075048a7466fb728eef54, type: 2}
 --- !u!1 &841370078
 GameObject:
   m_ObjectHideFlags: 0

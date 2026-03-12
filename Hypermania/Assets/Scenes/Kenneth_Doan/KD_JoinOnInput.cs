@@ -7,7 +7,7 @@ public class JoinOnInput : MonoBehaviour
     public InputDevice _P1_Input,
         _P2_Input = null;
 
-    private void Awake()
+    private void OnEnable()
     {
         /* Search for Any Button Press */
         anyButtonAction = new InputAction(binding: "/*/<button>");
@@ -15,9 +15,10 @@ public class JoinOnInput : MonoBehaviour
         anyButtonAction.Enable();
     }
 
-    void OnDisable()
+    public void OnDisable()
     {
         anyButtonAction.Disable();
+        anyButtonAction.performed -= OnAnyButtonPressed;
     }
 
     private void OnAnyButtonPressed(InputAction.CallbackContext context)

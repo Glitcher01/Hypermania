@@ -12,13 +12,12 @@ namespace Design.Configs
     public class ControlsConfig : ScriptableObject
     {
         [SerializeField]
-        private EnumArray<InputFlags, Binding> _controlSchemeP1;
+        private EnumArray<InputFlags, Binding> _controlScheme;
 
-        [SerializeField]
-        private EnumArray<InputFlags, Binding> _controlSchemeP2;
+        public EnumArray<InputFlags, Binding> ControlScheme => _controlScheme;
 
         // Dictionary for default bindings
-        private readonly Dictionary<InputFlags, Binding> _defaultBindings = new()
+        private static readonly Dictionary<InputFlags, Binding> _defaultBindings = new()
         {
             { InputFlags.None, new Binding(Key.None, Key.None, GamepadButtons.None, GamepadButtons.None) },
             { InputFlags.Up, new Binding(Key.W, Key.Space, GamepadButtons.DpadUp, GamepadButtons.None) },
@@ -38,6 +37,19 @@ namespace Design.Configs
             { InputFlags.Mania6, new Binding(Key.L, Key.None, GamepadButtons.South, GamepadButtons.None) },
         };
 
+        public static EnumArray<InputFlags, Binding> DefaultBindings
+        {
+            get
+            {
+                EnumArray<InputFlags, Binding> controls = new EnumArray<InputFlags, Binding>();
+                foreach (InputFlags flag in Enum.GetValues(typeof(InputFlags)))
+                {
+                    controls[flag] = _defaultBindings[flag];
+                }
+                return controls;
+            }
+        }
+
         public ControlsConfig()
         {
             OnEnable();
@@ -46,36 +58,15 @@ namespace Design.Configs
         // Sets Default Bindings onEnable to avoid Null Primary bindings
         private void OnEnable()
         {
-            _controlSchemeP1 ??= new EnumArray<InputFlags, Binding>();
-            _controlSchemeP2 ??= new EnumArray<InputFlags, Binding>();
+            _controlScheme ??= new EnumArray<InputFlags, Binding>();
 
             foreach (InputFlags flag in Enum.GetValues(typeof(InputFlags)))
             {
-                if (_controlSchemeP1[flag] == null)
+                if (_controlScheme[flag] == null)
                 {
-                    _controlSchemeP1[flag] = _defaultBindings[flag];
-                }
-                if (_controlSchemeP2[flag] == null)
-                {
-                    _controlSchemeP2[flag] = _defaultBindings[flag];
+                    _controlScheme[flag] = _defaultBindings[flag];
                 }
             }
-        }
-
-        /**
-         * Getter to return array of InputFlags and Bindings for Specific Player
-         */
-        public EnumArray<InputFlags, Binding> GetControlScheme(int index)
-        {
-            if (index == 1)
-            {
-                return _controlSchemeP1;
-            }
-            if (index == 2)
-            {
-                return _controlSchemeP2;
-            }
-            return null;
         }
     }
 

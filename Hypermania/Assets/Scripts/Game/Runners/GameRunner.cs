@@ -8,6 +8,7 @@ using Netcode.P2P;
 using Netcode.Rollback;
 using Steamworks;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Game.Runners
 {
@@ -22,20 +23,12 @@ namespace Game.Runners
         [SerializeField]
         protected bool _drawHitboxes;
 
-        [SerializeField]
-        protected ControlsConfig _controlsConfig;
-
         /// <summary>
         /// The current state of the runner. If you derive from this class, it must be initialized on Init();
         /// </summary>
         protected GameState _curState;
 
-        /// <summary>
-        /// The characters of each player. _characters[i] should represent the chararcter being played by handle i. If
-        /// you derive from this class, it must be initialized on Init();
-        /// </summary>
-        protected InputBuffer _inputBufferP1;
-        protected InputBuffer _inputBufferP2;
+        protected InputBuffer[] _inputBuffers;
         protected bool _initialized;
         protected float _time;
 
@@ -48,18 +41,17 @@ namespace Game.Runners
             {
                 throw new InvalidOperationException("must get 2 players");
             }
+
+            _inputBuffers = new InputBuffer[_options.LocalPlayers.Length];
+            for (int i = 0; i < _inputBuffers.Length; i++)
+            {
+                _inputBuffers[i] = new InputBuffer(
+                    _options.LocalPlayers[i].InputDevice ?? Keyboard.current,
+                    _options.LocalPlayers[i].Controls?.ControlScheme ?? ControlsConfig.DefaultBindings
+                );
+            }
             _curState = GameState.Create(_options);
             _view.Init(_options);
-            if (_controlsConfig == null)
-                _controlsConfig = ScriptableObject.CreateInstance<ControlsConfig>();
-            _inputBufferP1 = new InputBuffer(
-                GameObject.Find("GameManager").GetComponent<JoinOnInput>().GetPlayerInputDevice(1),
-                _controlsConfig.GetControlScheme(1)
-            );
-            _inputBufferP2 = new InputBuffer(
-                GameObject.Find("GameManager").GetComponent<JoinOnInput>().GetPlayerInputDevice(2),
-                _controlsConfig.GetControlScheme(2)
-            );
             _time = 0;
             _initialized = true;
         }
@@ -69,9 +61,8 @@ namespace Game.Runners
         public virtual void DeInit()
         {
             _initialized = false;
+            _inputBuffers = null;
             _time = 0;
-            _inputBufferP1 = null;
-            _inputBufferP2 = null;
             _view.DeInit();
             _curState = null;
         }

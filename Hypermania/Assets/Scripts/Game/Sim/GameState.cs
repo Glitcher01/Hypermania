@@ -7,6 +7,7 @@ using Game.View.Overlay;
 using MemoryPack;
 using Netcode.Rollback;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using Utils;
 using Utils.SoftFloat;
 
@@ -30,10 +31,18 @@ namespace Game.Sim
     }
 
     [Serializable]
+    public class LocalPlayerOptions
+    {
+        public InputDevice InputDevice;
+        public ControlsConfig Controls;
+    }
+
+    [Serializable]
     public class GameOptions
     {
         public GlobalConfig Global;
         public PlayerOptions[] Players;
+        public LocalPlayerOptions[] LocalPlayers;
     }
 
     [MemoryPackable]
@@ -249,7 +258,7 @@ namespace Game.Sim
                 }
             }
 
-            if (GameMode != GameMode.RoundEnd)
+            if (GameMode == GameMode.Mania || GameMode == GameMode.Fighting)
             {
                 for (int i = 0; i < Fighters.Length; i++)
                 {
