@@ -7,6 +7,7 @@ using Design.Configs;
 using Game.View.Overlay;
 using MemoryPack;
 using Netcode.Rollback;
+using UnityEngine;
 using Utils;
 using Utils.SoftFloat;
 
@@ -65,6 +66,7 @@ namespace Game.Sim
         public sfloat HypeMeter;
         public GameMode GameMode;
         public int HitstopFramesRemaining;
+        public Frame lifeLost;
 
         /// <summary>
         /// Use this static builder instead of the constructor for creating new GameStates. This is because MemoryPack,
@@ -143,7 +145,17 @@ namespace Game.Sim
             Span<GameInput> remapInputs = stackalloc GameInput[Fighters.Length];
             if (GameMode == GameMode.RoundEnd)
             {
-                DoRoundEnd(options, remapInputs);
+                if (lifeLost != null && RealFrame - lifeLost > 64)
+                {
+                    DoRoundEnd(options, remapInputs);
+                }
+                else
+                {
+                    for (int i = 0; i < Fighters.Length; i++)
+                    {
+                        remapInputs[i] = inputs[i].input;
+                    }
+                }
             }
             else if (GameMode == GameMode.Countdown)
             {
@@ -213,34 +225,41 @@ namespace Game.Sim
                 }
             }
 
-            for (int i = 0; i < Fighters.Length; i++)
+            if (GameMode != GameMode.RoundEnd)
             {
-                if (Fighters[i].Health <= 0)
+                for (int i = 0; i < Fighters.Length; i++)
                 {
-                    Fighters[i].Lives--;
-                    if (Fighters[i].Lives <= 0)
+                    if (Fighters[i].Health <= 0)
                     {
+                        Fighters[i].Lives--;
+                        if (Fighters[i].Lives <= 0)
+                        {
+                            return;
+                        }
+
+                        // Decide what victory indicator to give.
+                        if (Fighters[1 - i].Health == options.Players[1 - i].Character.Health)
+                        {
+                            Fighters[1 - i].Victories[Fighters[1 - i].NumVictories] = VictoryKind.Perfect;
+                        }
+                        else
+                        {
+                            Fighters[1 - i].Victories[Fighters[1 - i].NumVictories] = VictoryKind.Normal;
+                        }
+
+                        Fighters[1 - i].NumVictories++;
+                        GameMode = GameMode.RoundEnd;
+                        lifeLost = RealFrame;
+                        Debug.Log("Life was lost, recorded here");
+                        Fighters[i].setSpeedRate(RealFrame, (sfloat)0.1);
+                        Fighters[1 - i].setSpeedRate(RealFrame, (sfloat)0.1);
+                        // Ensure that if the player died to a mania attack it ends immediately
+                        for (int j = 0; j < Manias.Length; j++)
+                        {
+                            Manias[j].End();
+                        }
                         return;
                     }
-
-                    // Decide what victory indicator to give.
-                    if (Fighters[1 - i].Health == options.Players[1 - i].Character.Health)
-                    {
-                        Fighters[1 - i].Victories[Fighters[1 - i].NumVictories] = VictoryKind.Perfect;
-                    }
-                    else
-                    {
-                        Fighters[1 - i].Victories[Fighters[1 - i].NumVictories] = VictoryKind.Normal;
-                    }
-
-                    Fighters[1 - i].NumVictories++;
-                    GameMode = GameMode.RoundEnd;
-                    // Ensure that if the player died to a mania attack it ends immediately
-                    for (int j = 0; j < Manias.Length; j++)
-                    {
-                        Manias[j].End();
-                    }
-                    return;
                 }
             }
 

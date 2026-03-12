@@ -53,7 +53,7 @@ namespace Game.View.Fighters
             int totalTicks = _characterConfig.GetHitboxData(animState).TotalTicks;
 
             int ticks = state.CurrentTick;
-            if (_characterConfig.AnimLoops(animation))
+            if (_characterConfig.AnimLoops(animState))
             {
                 ticks %= totalTicks;
             }

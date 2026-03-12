@@ -54,7 +54,7 @@ namespace Game.Sim
         /// Set to a value that marks the first frame in which the character should return to neutral.
         /// </summary>
         public Frame StateEnd { get; private set; }
-        public Frame ImmunityEnd { get; private set; }
+        public Frame ImmunityEnd { get; set; }
 
         public FighterFacing FacingDir;
 
@@ -124,7 +124,7 @@ namespace Game.Sim
                 AirDashCount = 0,
                 Victories = new VictoryKind[lives],
                 NumVictories = 0,
-                SpeedRate = (sfloat)1
+                SpeedRate = (sfloat)1,
             };
             return state;
         }
@@ -144,6 +144,7 @@ namespace Game.Sim
             AirDashCount = 0;
             Health = config.Health;
             FacingDir = facingDirection;
+            SpeedRate = (sfloat)1;
         }
 
         public void DoFrameStart(GameOptions options)
@@ -191,12 +192,28 @@ namespace Game.Sim
                 StateStart = start;
                 if (end != Frame.Infinity)
                 {
-                    int duration = (int)((sfloat) (end.No - start.No) / SpeedRate);
+                    int duration = (int)((sfloat)(end.No - start.No) / SpeedRate);
                     StateEnd = start + duration;
                 }
-                else {
+                else
+                {
                     StateEnd = Frame.Infinity;
                 }
+            }
+        }
+
+        // To be ran during a round end / during a round.
+        public void setSpeedRate(Frame frame, sfloat value)
+        {
+            SpeedRate = value;
+            if (StateEnd != Frame.Infinity)
+            {
+                // If the animation isn't done yet, update it!
+                if (StateEnd - frame > 0)
+                {
+                    StateEnd = frame + (int)((sfloat)(StateEnd - frame) / SpeedRate);
+                }
+                StateStart = frame - (int)((sfloat)(frame - StateStart) / SpeedRate);
             }
         }
 
