@@ -14,7 +14,7 @@ namespace Game.View.Mania
 
         private Image _imageComponent;
 
-        void Start()
+        void Awake()
         {
             _imageComponent = GetComponent<Image>();
             if (_imageComponent != null)

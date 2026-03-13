@@ -21,10 +21,11 @@ namespace Game.Runners
 
         public override void Init(
             List<(PlayerHandle playerHandle, PlayerKind playerKind, SteamNetworkingIdentity address)> players,
-            P2PClient client
+            P2PClient client,
+            GameOptions overrideOptions
         )
         {
-            base.Init(players, client);
+            base.Init(players, client, overrideOptions);
 
             SessionBuilder<GameInput, SteamNetworkingIdentity> builder = new SessionBuilder<
                 GameInput,
@@ -106,11 +107,11 @@ namespace Game.Runners
             while (_time > fpsDelta)
             {
                 _time -= fpsDelta;
-                GameLoop();
+                GameLoop(fpsDelta);
             }
         }
 
-        void GameLoop()
+        void GameLoop(float deltaTime)
         {
             if (_session.CurrentState != SessionState.Running)
             {
@@ -157,7 +158,7 @@ namespace Game.Runners
                 HasPing = true,
                 Ping = _session.NetworkStats(_remoteHandle).Ping,
             };
-            _view.Render(_curState, _options, details);
+            _view.Render(deltaTime, _curState, _options, details);
         }
     }
 }

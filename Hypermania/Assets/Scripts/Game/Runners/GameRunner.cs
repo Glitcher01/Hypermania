@@ -12,14 +12,14 @@ using UnityEngine.InputSystem;
 
 namespace Game.Runners
 {
-    [RequireComponent(typeof(JoinOnInput))]
     public abstract class GameRunner : MonoBehaviour
     {
         [SerializeField]
         protected GameView _view;
 
+        //TODO: ADDRESS ME (Set to public for device management)
         [SerializeField]
-        protected GameOptions _options;
+        public GameOptions _options;
 
         [SerializeField]
         protected bool _drawHitboxes;
@@ -33,16 +33,10 @@ namespace Game.Runners
         protected bool _initialized;
         protected float _time;
 
-        protected JoinOnInput _joinOnInput;
-
-        public void Awake()
-        {
-            _joinOnInput = GetComponent<JoinOnInput>();
-        }
-
         public virtual void Init(
             List<(PlayerHandle playerHandle, PlayerKind playerKind, SteamNetworkingIdentity address)> players,
-            P2PClient client
+            P2PClient client,
+            GameOptions overrideOptions
         )
         {
             if (players.Count != 2)
@@ -50,12 +44,16 @@ namespace Game.Runners
                 throw new InvalidOperationException("must get 2 players");
             }
 
+            if (overrideOptions != null)
+            {
+                _options = overrideOptions;
+            }
             _inputBuffers = new InputBuffer[_options.LocalPlayers.Length];
             for (int i = 0; i < _inputBuffers.Length; i++)
             {
                 _inputBuffers[i] = new InputBuffer(
-                    _options.LocalPlayers[i].InputDevice ?? _joinOnInput.GetPlayerInputDevice(i) ?? Keyboard.current,
-                    _options.LocalPlayers[i].Controls?.ControlScheme ?? ControlsConfig.DefaultBindings
+                    _options.LocalPlayers[i]?.InputDevice ?? Keyboard.current,
+                    _options.LocalPlayers[i]?.Controls?.ControlScheme ?? ControlsConfig.DefaultBindings
                 );
             }
             _curState = GameState.Create(_options);

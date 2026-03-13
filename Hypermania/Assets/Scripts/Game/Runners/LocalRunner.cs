@@ -15,10 +15,11 @@ namespace Game.Runners
 
         public override void Init(
             List<(PlayerHandle playerHandle, PlayerKind playerKind, SteamNetworkingIdentity address)> players,
-            P2PClient client
+            P2PClient client,
+            GameOptions overrideOptions
         )
         {
-            base.Init(players, client);
+            base.Init(players, client, overrideOptions);
 
             SessionBuilder<GameInput, SteamNetworkingIdentity> builder = new SessionBuilder<
                 GameInput,
@@ -66,11 +67,11 @@ namespace Game.Runners
             while (_time > fpsDelta)
             {
                 _time -= fpsDelta;
-                GameLoop();
+                GameLoop(fpsDelta);
             }
         }
 
-        protected void GameLoop()
+        protected void GameLoop(float deltaTime)
         {
             if (_session == null)
             {
@@ -110,7 +111,7 @@ namespace Game.Runners
                 return;
             }
             InfoOverlayDetails details = new InfoOverlayDetails { HasPing = false, Ping = 0 };
-            _view.Render(_curState, _options, details);
+            _view.Render(deltaTime, _curState, _options, details);
         }
     }
 }
